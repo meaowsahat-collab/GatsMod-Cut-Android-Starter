@@ -10,23 +10,39 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+
 class MainActivity:AppCompatActivity(){
  private var player:ExoPlayer?=null
  private lateinit var timeline:TimelineView
- private val picker=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->if(uri!=null){try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}catch(_:SecurityException){};loadVideo(uri)}}
- override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContentView(R.layout.activity_main);player=ExoPlayer.Builder(this).build().also{findViewById<PlayerView>(R.id.playerView).player=it};timeline=findViewById(R.id.timeline);timeline.onSeek={player?.seekTo(it)}
- findViewById<Button>(R.id.importButton).setOnClickListener{picker.launch(arrayOf("video/*"))}
- findViewById<Button>(R.id.splitButton).setOnClickListener{timeline.split();info("Split updated in timeline model (rendering not yet implemented).")}
- findViewById<Button>(R.id.trimStartButton).setOnClickListener{timeline.trimStart();info("Selected segment start adjusted in timeline model.")}
- findViewById<Button>(R.id.trimEndButton).setOnClickListener{timeline.trimEnd();info("Selected segment end adjusted in timeline model.")}
+ private val videoPicker=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{persist(it);loadVideo(it,LaneKind.VIDEO)}}
+ private val audioPicker=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{persist(it);loadVideo(it,LaneKind.AUDIO)}}
+ private fun persist(uri:Uri){try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}catch(_:SecurityException){}}
+ override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContentView(R.layout.activity_main)
+ player=ExoPlayer.Builder(this).build().also{findViewById<PlayerView>(R.id.playerView).player=it};timeline=findViewById(R.id.timeline);timeline.onSeek={player?.seekTo(it)};timeline.onSelection={c->info(c?.let{"Selected: ${it.label} • ${it.kind} • ${it.startMs}–${it.endMs} ms"}?: "No clip selected")}
+ findViewById<Button>(R.id.importButton).setOnClickListener{videoPicker.launch(arrayOf("video/*"))}
+ findViewById<Button>(R.id.audioImportButton).setOnClickListener{audioPicker.launch(arrayOf("audio/*"))}
+ findViewById<Button>(R.id.textClipButton).setOnClickListener{inputTextClip(LaneKind.TEXT)}
+ findViewById<Button>(R.id.overlayButton).setOnClickListener{inputTextClip(LaneKind.OVERLAY)}
+ findViewById<Button>(R.id.splitButton).setOnClickListener{timeline.split();info("Split applied to selected timeline clip")}
+ findViewById<Button>(R.id.trimStartButton).setOnClickListener{timeline.trimStart();info("Trim start applied")}
+ findViewById<Button>(R.id.trimEndButton).setOnClickListener{timeline.trimEnd();info("Trim end applied")}
+ findViewById<Button>(R.id.duplicateButton).setOnClickListener{timeline.duplicate();info("Clip duplicated")}
+ findViewById<Button>(R.id.deleteButton).setOnClickListener{timeline.delete();info("Clip deleted")}
+ findViewById<Button>(R.id.mergeButton).setOnClickListener{timeline.merge();info("Merge: adjacent same-track clips only")}
+ findViewById<Button>(R.id.nudgeLeftButton).setOnClickListener{timeline.nudgeFrames(-1);info("Moved left by one frame (~33ms)")}
+ findViewById<Button>(R.id.nudgeRightButton).setOnClickListener{timeline.nudgeFrames(1);info("Moved right by one frame (~33ms)")}
+ findViewById<Button>(R.id.undoButton).setOnClickListener{timeline.undo();info("Undo")}
+ findViewById<Button>(R.id.redoButton).setOnClickListener{timeline.redo();info("Redo")}
  findViewById<Button>(R.id.zoomInButton).setOnClickListener{timeline.zoomIn()}
  findViewById<Button>(R.id.zoomOutButton).setOnClickListener{timeline.zoomOut()}
+ findViewById<Button>(R.id.addVideoLaneButton).setOnClickListener{timeline.addLane(LaneKind.VIDEO)}
+ findViewById<Button>(R.id.addAudioLaneButton).setOnClickListener{timeline.addLane(LaneKind.AUDIO)}
  findViewById<Button>(R.id.speedButton).setOnClickListener{val p=player?:return@setOnClickListener;val n=if(p.playbackParameters.speed>=1.9f)1f else p.playbackParameters.speed+.5f;p.setPlaybackSpeed(n);Toast.makeText(this,"Preview speed: ${n}x",Toast.LENGTH_SHORT).show()}
- findViewById<Button>(R.id.exportButton).setOnClickListener{info("Export is not implemented. Timeline edits are not yet rendered into output video.")}
+ findViewById<Button>(R.id.exportButton).setOnClickListener{info("Export/rendering is not implemented yet. Timeline operations currently edit the project model.")}
  }
- private fun loadVideo(uri:Uri){val p=player?:return;p.setMediaItem(MediaItem.fromUri(uri));p.prepare();p.playWhenReady=true;findViewById<TextView>(R.id.emptyPreview).visibility=android.view.View.GONE;p.addListener(object:androidx.media3.common.Player.Listener{override fun onPlaybackStateChanged(state:Int){if(state==androidx.media3.common.Player.STATE_READY&&timeline.durationMs==0L)timeline.setDuration(p.duration.takeIf{it>0}?:1L)}});findViewById<Button>(R.id.exportButton).isEnabled=true;info("Video loaded")}
+ private fun inputTextClip(kind:LaneKind){val edit=android.widget.EditText(this);edit.hint=if(kind==LaneKind.TEXT)"Text clip content" else "Overlay label";androidx.appcompat.app.AlertDialog.Builder(this).setTitle(if(kind==LaneKind.TEXT)"Add text clip" else "Add overlay").setView(edit).setPositiveButton("Add"){_,_->val value=edit.text.toString().trim();if(value.isNotEmpty())timeline.addClip(kind,value,duration=3000L);info("Added ${kind.name.lowercase()} clip")}.setNegativeButton("Cancel",null).show()}
+ private fun loadVideo(uri:Uri,kind:LaneKind){val p=player?:return;if(kind==LaneKind.VIDEO){p.setMediaItem(MediaItem.fromUri(uri));p.prepare();p.playWhenReady=true;findViewById<TextView>(R.id.emptyPreview).visibility=android.view.View.GONE;p.addListener(object:androidx.media3.common.Player.Listener{override fun onPlaybackStateChanged(state:Int){if(state==androidx.media3.common.Player.STATE_READY){val d=p.duration.takeIf{it>0}?:1L;timeline.setDuration(maxOf(timeline.durationMs,d));timeline.addClip(LaneKind.VIDEO,"Video",uri.toString(),d)}}})}else timeline.addClip(LaneKind.AUDIO,"Audio",uri.toString(),timeline.durationMs.coerceAtLeast(3000L));findViewById<Button>(R.id.exportButton).isEnabled=true;info("${kind.name.lowercase()} imported into timeline")}
  private fun info(s:String){findViewById<TextView>(R.id.clipInfo).text=s}
- private fun show(t:String,m:String){androidx.appcompat.app.AlertDialog.Builder(this).setTitle(t).setMessage(m).setPositiveButton("OK",null).show()}
  override fun onStop(){super.onStop();player?.pause()}
  override fun onDestroy(){player?.release();player=null;super.onDestroy()}
 }
