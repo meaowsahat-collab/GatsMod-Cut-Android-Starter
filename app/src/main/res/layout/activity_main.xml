@@ -1,114 +1,17 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#101512"
-    android:padding="16dp">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="GatsMod Cut"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold"/>
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="OFFLINE READY"
-            android:textColor="#7CE6B0"
-            android:textSize="11sp"/>
-    </LinearLayout>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Create something worth watching"
-        android:textColor="#AAB7AF"
-        android:textSize="13sp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="14dp"/>
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#080B09">
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/playerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:show_buffering="when_playing"
-            app:use_controller="true"
-            app:resize_mode="fit"/>
-        <TextView
-            android:id="@+id/emptyPreview"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="Choose a video to start editing"
-            android:textColor="#AAB7AF"
-            android:textSize="14sp"/>
-    </FrameLayout>
-
-    <Button
-        android:id="@+id/importButton"
-        android:layout_width="match_parent"
-        android:layout_height="54dp"
-        android:text="＋  Import Video"
-        android:textAllCaps="false"
-        android:layout_marginTop="14dp"/>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="EDITING WORKSPACE"
-        android:textColor="#7CE6B0"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:layout_marginTop="18dp"/>
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:layout_marginTop="8dp">
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <Button android:id="@+id/trimButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Trim" android:textAllCaps="false"/>
-            <Button android:id="@+id/splitButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Split" android:textAllCaps="false"/>
-            <Button android:id="@+id/textButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Text" android:textAllCaps="false"/>
-            <Button android:id="@+id/musicButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Music" android:textAllCaps="false"/>
-            <Button android:id="@+id/speedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Speed" android:textAllCaps="false"/>
-            <Button android:id="@+id/filterButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Filters" android:textAllCaps="false"/>
-        </LinearLayout>
-    </HorizontalScrollView>
-
-    <TextView
-        android:id="@+id/clipInfo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="No clip selected"
-        android:textColor="#AAB7AF"
-        android:textSize="12sp"
-        android:paddingTop="10dp"
-        android:paddingBottom="6dp"/>
-
-    <Button
-        android:id="@+id/exportButton"
-        android:layout_width="match_parent"
-        android:layout_height="54dp"
-        android:text="Export Video"
-        android:textAllCaps="false"
-        android:enabled="false"/>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#101512" android:padding="12dp">
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="GatsMod Cut" android:textColor="#FFFFFF" android:textSize="24sp" android:textStyle="bold"/>
+<FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="#080B09"><androidx.media3.ui.PlayerView android:id="@+id/playerView" android:layout_width="match_parent" android:layout_height="match_parent" app:use_controller="true" app:resize_mode="fit"/><TextView android:id="@+id/emptyPreview" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:text="ভিডিও Import করুন" android:textColor="#AAB7AF"/></FrameLayout>
+<Button android:id="@+id/importButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="＋ ভিডিও Import" android:textAllCaps="false"/>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="TIMELINE • Playhead সরান" android:textColor="#7CE6B0" android:textStyle="bold" android:paddingTop="8dp"/>
+<com.gatsmod.cut.TimelineView android:id="@+id/timeline" android:layout_width="match_parent" android:layout_height="132dp"/>
+<HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none"><LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+<Button android:id="@+id/splitButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Split" android:textAllCaps="false"/>
+<Button android:id="@+id/trimStartButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Trim Start" android:textAllCaps="false"/>
+<Button android:id="@+id/trimEndButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Trim End" android:textAllCaps="false"/>
+<Button android:id="@+id/zoomInButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Zoom +" android:textAllCaps="false"/>
+<Button android:id="@+id/zoomOutButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Zoom -" android:textAllCaps="false"/>
+<Button android:id="@+id/speedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Speed" android:textAllCaps="false"/>
+</LinearLayout></HorizontalScrollView>
+<TextView android:id="@+id/clipInfo" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="No clip selected" android:textColor="#C8D4CC" android:padding="6dp"/>
+<Button android:id="@+id/exportButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="Export" android:textAllCaps="false" android:enabled="false"/>
 </LinearLayout>
