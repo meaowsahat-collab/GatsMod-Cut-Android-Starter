@@ -20,3 +20,6 @@ Open in Android Studio with JDK 17 and Android SDK Platform 35. Gradle wrapper i
 
 
 ## Effects & Export controls (prototype)\n- Brightness, contrast, saturation and blur control dialogs\n- Filter preset selection UI\n- Keyframe marker UI\n- Chroma Key toggle UI\n- Export presets: 720p/1080p/4K and 24/30/60 FPS, MP4 selection UI\n\n**Rendering limitations:** These are control/settings prototypes and currently do not apply visual effects to rendered footage. Keyframes and Chroma Key are not implemented as processing features. Export encoding, progress reporting and cancellation are not implemented yet. Do not treat the app as a working export editor until those engine pieces are added and tested.
+
+
+## MP4 export engine (initial implementation)\n- Uses Media3 Transformer to encode the selected single video source to MP4 H.264 with AAC audio where supported.\n- Progress polling UI and cancel action.\n- Output is stored in the app-specific Movies folder (not the public gallery yet).\n- Export presets/resolution/FPS UI is not yet applied to encoding; multi-track edits, effects, subtitle burn-in, and timeline changes are not exported.\n- Build and device verification still required.
