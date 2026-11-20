@@ -10,8 +10,28 @@ android {
         applicationId = "com.gatsmod.cut"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // CI passes these from the release tag / run number; local builds use the defaults.
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toInt() ?: 1
+        versionName = (project.findProperty("appVersionName") as String?) ?: "1.0.0"
+    }
+    // One permanent key for every build, so each new APK installs as an update
+    // over the old one (no uninstall). Never change or delete keystore/gatsmod-release.jks.
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("keystore/gatsmod-release.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "gatsmodcut2026"
+            keyAlias = "gatsmod"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "gatsmodcut2026"
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
     buildFeatures { viewBinding = true }
     compileOptions {

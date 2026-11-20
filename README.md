@@ -20,3 +20,8 @@ Open in Android Studio with JDK 17 and Android SDK Platform 35. Gradle wrapper i
 
 
 ## Effects & Export controls (prototype)\n- Brightness, contrast, saturation and blur control dialogs\n- Filter preset selection UI\n- Keyframe marker UI\n- Chroma Key toggle UI\n- Export presets: 720p/1080p/4K and 24/30/60 FPS, MP4 selection UI\n\n**Rendering limitations:** These are control/settings prototypes and currently do not apply visual effects to rendered footage. Keyframes and Chroma Key are not implemented as processing features. Export encoding, progress reporting and cancellation are not implemented yet. Do not treat the app as a working export editor until those engine pieces are added and tested.
+
+## Auto update
+The app checks the latest GitHub Release on start (and via the "Check Update" button). If a newer version exists it downloads the APK and opens the installer, so no uninstall is needed.
+- Every build is signed with `keystore/gatsmod-release.jks`. **Never replace or delete this file**, otherwise Android will refuse to install updates over the old app.
+- To publish an update: `git tag v1.1.0 && git push origin v1.1.0`. GitHub Actions builds the signed APK and attaches it to the Release. The tag number must be higher than the previous one.
