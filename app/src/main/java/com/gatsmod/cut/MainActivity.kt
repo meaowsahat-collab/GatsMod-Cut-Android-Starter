@@ -13,12 +13,12 @@ import androidx.media3.ui.PlayerView
 
 class MainActivity:AppCompatActivity(){
  private var player:ExoPlayer?=null
- private lateinit var timeline:TimelineView
+ private lateinit var timeline:TimelineView\n private var pendingVideoUri:Uri?=null
  private val videoPicker=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{persist(it);loadVideo(it,LaneKind.VIDEO)}}
  private val audioPicker=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{persist(it);loadVideo(it,LaneKind.AUDIO)}}
  private fun persist(uri:Uri){try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}catch(_:SecurityException){}}
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContentView(R.layout.activity_main)
- player=ExoPlayer.Builder(this).build().also{findViewById<PlayerView>(R.id.playerView).player=it};timeline=findViewById(R.id.timeline);timeline.onSeek={player?.seekTo(it)};timeline.onSelection={c->info(c?.let{"Selected: ${it.label} • ${it.kind} • ${it.startMs}–${it.endMs} ms"}?: "No clip selected")}
+ player=ExoPlayer.Builder(this).build().also{p->findViewById<PlayerView>(R.id.playerView).player=p;p.addListener(object:androidx.media3.common.Player.Listener{override fun onPlaybackStateChanged(state:Int){if(state==androidx.media3.common.Player.STATE_READY){pendingVideoUri?.let{uri->val d=p.duration.takeIf{it>0}?:3000L;timeline.setDuration(maxOf(timeline.durationMs,d));timeline.addClip(LaneKind.VIDEO,"Video",uri.toString(),d);pendingVideoUri=null}}}})};timeline=findViewById(R.id.timeline);timeline.onSeek={player?.seekTo(it)};timeline.onSelection={c->info(c?.let{"Selected: ${it.label} • ${it.kind} • ${it.startMs}–${it.endMs} ms"}?: "No clip selected")}
  findViewById<Button>(R.id.importButton).setOnClickListener{videoPicker.launch(arrayOf("video/*"))}
  findViewById<Button>(R.id.audioImportButton).setOnClickListener{audioPicker.launch(arrayOf("audio/*"))}
  findViewById<Button>(R.id.textClipButton).setOnClickListener{inputTextClip(LaneKind.TEXT)}
