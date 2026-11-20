@@ -23,7 +23,7 @@ class TimelineView(context:Context,attrs:AttributeSet?=null):View(context,attrs)
  private val grid=Paint().apply{color=0xFF39433D.toInt();strokeWidth=1f}
  var durationMs=0L;var playheadMs=0L;var zoom=1f;var selectedLane=0;var selectedClip=0
  var lanes= mutableListOf<TimelineLane>()
- private val undoStack=mutableListOf<String>();private val redoStack=mutableListOf<String>()
+ private val undoStack=mutableListOf<List<TimelineLane>>();private val redoStack=mutableListOf<List<TimelineLane>>()
  var onSeek:((Long)->Unit)?=null;var onSelection:((TimelineClip?)->Unit)?=null
  private var dragging=false;private var dragStartX=0f;private var originalStart=0L
  private val frameMs=33L
