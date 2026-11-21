@@ -53,6 +53,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var muteIcon: ImageView
     private lateinit var muteLabel: TextView
 
+    private var projectId = ""
+    private var projectName = "Project"
     private var resShort = 1080
     private var fps = 30
     private var fullscreen = false
@@ -131,8 +133,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.fullscreenButton).setOnClickListener { toggleFullscreen() }
         findViewById<View>(R.id.muteBox).setOnClickListener { toggleMute() }
         findViewById<View>(R.id.menuButton).setOnClickListener {
-            sheet("Close editor?", label("Your edit is not saved as a project yet. Export first if you want to keep it."),
-                button("Close editor") { finish() })
+            finish()
         }
         findViewById<View>(R.id.settingsButton).setOnClickListener { aboutDialog() }
         findViewById<View>(R.id.exportButton).setOnClickListener { startExport() }
@@ -149,7 +150,6 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        updater.cleanup()
         if (crashFile.exists()) {
             val txt = try { crashFile.readText() } catch (_: Exception) { "" }
             crashFile.delete()
@@ -161,8 +161,18 @@ class MainActivity : AppCompatActivity() {
                 tv.setTextIsSelectable(true)
                 sheet("The app crashed last time", label("Send this text to the developer:"), tv)
             }
-        } else {
-            updater.check(true)
+        }
+        projectId = intent.getStringExtra("id") ?: ("p" + System.currentTimeMillis())
+        projectName = "Project " + java.text.SimpleDateFormat("MMdd-HH", java.util.Locale.US).format(java.util.Date())
+        if (intent.hasExtra("id")) {
+            val n = ProjectStore.load(this, projectId, project)
+            if (n == null) toast("Could not open this project") else {
+                projectName = n
+                engine.refresh()
+                if (!project.isEmpty()) engine.seekTo(0)
+            }
+        } else if (intent.getBooleanExtra("pick", false)) {
+            ui.postDelayed({ pickVideo() }, 250)
         }
         syncUi()
         tickLoop()
@@ -180,7 +190,42 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() { super.onResume(); updater.resumePendingInstall() }
 
-    override fun onPause() { super.onPause(); engine.pause() }
+    override fun onPause() { super.onPause(); engine.pause(); saveProject() }
+
+    /** Autosave: writes the project file now, and the size and cover picture in the background. */
+    private fun saveProject() {
+        if (project.isEmpty() || projectId.isEmpty()) return
+        val json = ProjectStore.toJson(projectName, project, 0)
+        val uris = (project.main + project.audio + project.overlay).map { it.uri }.filter { it.isNotEmpty() }.distinct()
+        val first = project.main.first()
+        val coverUri = first.uri
+        val coverMs = first.srcInMs
+        val id = projectId
+        val app = applicationContext
+        Thread {
+            var size = 0L
+            uris.forEach { u ->
+                try {
+                    app.contentResolver.query(Uri.parse(u), arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) size += c.getLong(0)
+                    }
+                } catch (_: Exception) {}
+            }
+            try { json.put("size", size); ProjectStore.write(app, id, json) } catch (_: Exception) {}
+            try {
+                val r = android.media.MediaMetadataRetriever()
+                r.setDataSource(app, Uri.parse(coverUri))
+                val full = r.getFrameAtTime(coverMs * 1000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                r.release()
+                if (full != null) {
+                    val w = 240
+                    val h = (w * full.height.toFloat() / full.width).toInt().coerceAtLeast(1)
+                    val sm = android.graphics.Bitmap.createScaledBitmap(full, w, h, true)
+                    ProjectStore.thumb(app, id).outputStream().use { sm.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }
+                }
+            } catch (_: Exception) {}
+        }.start()
+    }
 
     override fun onDestroy() {
         ui.removeCallbacksAndMessages(null)

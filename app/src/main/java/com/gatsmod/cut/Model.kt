@@ -101,7 +101,7 @@ object Keyframes {
 class Project {
     companion object { const val MIN_MS = 100L }
 
-    private var nextId = 1L
+    var nextId = 1L
     var main = mutableListOf<Clip>()
     var audio = mutableListOf<Clip>()
     var text = mutableListOf<Clip>()
