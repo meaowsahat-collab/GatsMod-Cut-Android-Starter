@@ -30,9 +30,10 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             NAME="${GITHUB_REF_NAME#v}"
           else
-            NAME="0.0.${GITHUB_RUN_NUMBER}-ci"
+            NAME="1.0.${GITHUB_RUN_NUMBER}"
           fi
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Version $NAME (code $GITHUB_RUN_NUMBER)"
       - name: Build signed APK
@@ -46,10 +47,13 @@ jobs:
         with:
           name: GatsMod-Cut-APK
           path: GatsMod-Cut-*.apk
-      - name: Publish tagged release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: GatsMod Cut ${{ steps.ver.outputs.tag }}
           files: GatsMod-Cut-*.apk
           generate_release_notes: true
           make_latest: true

@@ -24,4 +24,4 @@ Open in Android Studio with JDK 17 and Android SDK Platform 35. Gradle wrapper i
 ## Auto update
 The app checks the latest GitHub Release on start (and via the "Check Update" button). If a newer version exists it downloads the APK and opens the installer, so no uninstall is needed.
 - Every build is signed with `keystore/gatsmod-release.jks`. **Never replace or delete this file**, otherwise Android will refuse to install updates over the old app.
-- To publish an update: `git tag v1.1.0 && git push origin v1.1.0`. GitHub Actions builds the signed APK and attaches it to the Release. The tag number must be higher than the previous one.
+- To publish an update: just push to `main`. GitHub Actions builds the signed APK and creates a Release `v1.0.<run number>` automatically (the number always goes up). Pushing a `v*` tag by hand also works.
