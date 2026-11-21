@@ -95,6 +95,10 @@ class MainActivity : AppCompatActivity() {
             override fun onPlayingChanged(playing: Boolean) {
                 runOnUiThread { playButton.setImageResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play) }
             }
+
+            override fun onProblem(message: String) {
+                runOnUiThread { Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show() }
+            }
         }
 
         timeline.onScrub = { ms ->
@@ -429,7 +433,10 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun live() { engine.refresh(); timeline.invalidate() }
+    private val liveRun = Runnable { engine.refresh(); timeline.invalidate() }
+
+    /** Slider changes: wait a moment so the preview is not rebuilt on every pixel of movement. */
+    private fun live() { ui.removeCallbacks(liveRun); ui.postDelayed(liveRun, 180) }
 
     // ============================================================ bottom tool row (CapCut style)
 

@@ -20,7 +20,11 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
 
     interface Listener {
         fun onPlayingChanged(playing: Boolean)
+        fun onProblem(message: String) {}
     }
+
+    private var effectsOk = true
+    private var appliedFx = "\u0000"
 
     var listener: Listener? = null
     val player: ExoPlayer = ExoPlayer.Builder(ctx).build()
@@ -40,6 +44,17 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) audioPlayer.pause()
                 listener?.onPlayingChanged(isPlaying)
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                // Never leave the preview dead: report it, drop the preview effects and restart playback.
+                listener?.onProblem("Preview problem: ${error.errorCodeName} ${error.cause?.message ?: error.message ?: ""}".trim())
+                if (effectsOk) {
+                    effectsOk = false
+                    rebuild(emptyList())
+                } else {
+                    try { player.prepare() } catch (_: Exception) {}
+                }
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -94,6 +109,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
                 player.setMediaItems(items, false)
                 player.prepare()
                 appliedKey = ""
+                appliedFx = "\u0000"
                 seekTo(min(keep, project.totalMs() - 1))
             }
         } else {
@@ -133,13 +149,38 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
             )
             .build()
 
+    /** Re-creates the playlist with a new effect list (the safe way to change preview effects). */
+    private fun rebuild(effects: List<androidx.media3.common.Effect>) {
+        val items = project.main.map { mediaItem(it) }
+        if (items.isEmpty()) return
+        val c = project.mainClipAt(playheadMs) ?: project.main.last()
+        val idx = project.main.indexOf(c).coerceAtLeast(0)
+        val pos = ((playheadMs - c.startMs).coerceAtLeast(0L) * c.speed).toLong()
+        val play = player.playWhenReady
+        player.setVideoEffects(effects)
+        player.setMediaItems(items, idx, pos)
+        player.prepare()
+        player.playWhenReady = play
+    }
+
     /** Applies speed, volume and effects of the clip under the playhead. */
     private fun applyLook(force: Boolean) {
         val c = project.mainClipAt(playheadMs) ?: return
         val key = "${c.id}|${c.paramSig()}"
         if (!force && key == appliedKey) return
         appliedKey = key
-        player.setVideoEffects(Fx.previewEffects(c) { playheadMs - c.startMs })
+        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|" +
+            "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
+            c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" } else "off"
+        if (fxKey != appliedFx) {
+            val hadAny = appliedFx != "\u0000"
+            appliedFx = fxKey
+            val fx = if (effectsOk) {
+                try { Fx.previewEffects(c) { playheadMs - c.startMs } } catch (e: Exception) { effectsOk = false; emptyList() }
+            } else emptyList()
+            // empty -> empty needs no rebuild
+            if (hadAny || fx.isNotEmpty()) rebuild(fx)
+        }
         player.playbackParameters = PlaybackParameters(c.speed)
         player.volume = c.volume
     }
