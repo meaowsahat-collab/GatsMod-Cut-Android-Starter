@@ -74,10 +74,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val crashFile = File(filesDir, "crash.txt")
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try { crashFile.writeText(android.util.Log.getStackTraceString(e)) } catch (_: Exception) {}
+            previous?.uncaughtException(t, e)
+        }
         setContentView(R.layout.activity_main)
         engine = PreviewEngine(this, project)
 
-        findViewById<PlayerView>(R.id.playerView).player = engine.player
+        val pv = findViewById<PlayerView>(R.id.playerView)
+        pv.player = engine.player
+        engine.onPlayerReplaced = { p -> pv.player = p }
         timeline = findViewById(R.id.timeline)
         overlayView = findViewById(R.id.overlayView)
         playButton = findViewById(R.id.playButton)
@@ -142,7 +150,20 @@ class MainActivity : AppCompatActivity() {
         })
 
         updater.cleanup()
-        updater.check(true)
+        if (crashFile.exists()) {
+            val txt = try { crashFile.readText() } catch (_: Exception) { "" }
+            crashFile.delete()
+            if (txt.isNotBlank()) {
+                val tv = TextView(this)
+                tv.text = txt.take(1800)
+                tv.setTextColor(0xFFFF8A80.toInt())
+                tv.textSize = 9f
+                tv.setTextIsSelectable(true)
+                sheet("The app crashed last time", label("Send this text to the developer:"), tv)
+            }
+        } else {
+            updater.check(true)
+        }
         syncUi()
         tickLoop()
     }

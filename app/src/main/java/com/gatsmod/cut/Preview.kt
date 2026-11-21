@@ -27,7 +27,11 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     private var appliedFx = "\u0000"
 
     var listener: Listener? = null
-    val player: ExoPlayer = ExoPlayer.Builder(ctx).build()
+    var player: ExoPlayer = ExoPlayer.Builder(ctx).build()
+        private set
+
+    /** Called when the underlying player was replaced (the view must attach to the new one). */
+    var onPlayerReplaced: ((ExoPlayer) -> Unit)? = null
     private val audioPlayer: ExoPlayer = ExoPlayer.Builder(ctx).build()
 
     /** Playhead position on the timeline, in milliseconds. */
@@ -38,33 +42,36 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     private var appliedKey = ""
     private var audioClipId = -1L
 
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (!isPlaying) audioPlayer.pause()
+            listener?.onPlayingChanged(isPlaying)
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            // Never leave the preview dead: report it, drop the preview effects and restart playback.
+            listener?.onProblem("Preview problem: ${error.errorCodeName} ${error.cause?.message ?: error.message ?: ""}".trim())
+            if (effectsOk) {
+                effectsOk = false
+                appliedFx = "off"
+                rebuild(emptyList())
+            } else {
+                try { player.prepare() } catch (_: Exception) {}
+            }
+        }
+
+        override fun onPlaybackStateChanged(state: Int) {
+            if (state == Player.STATE_ENDED) {
+                playheadMs = project.totalMs()
+                audioPlayer.pause()
+                listener?.onPlayingChanged(false)
+            }
+        }
+    }
+
     init {
         player.setVideoEffects(emptyList())
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (!isPlaying) audioPlayer.pause()
-                listener?.onPlayingChanged(isPlaying)
-            }
-
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                // Never leave the preview dead: report it, drop the preview effects and restart playback.
-                listener?.onProblem("Preview problem: ${error.errorCodeName} ${error.cause?.message ?: error.message ?: ""}".trim())
-                if (effectsOk) {
-                    effectsOk = false
-                    rebuild(emptyList())
-                } else {
-                    try { player.prepare() } catch (_: Exception) {}
-                }
-            }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED) {
-                    playheadMs = project.totalMs()
-                    audioPlayer.pause()
-                    listener?.onPlayingChanged(false)
-                }
-            }
-        })
+        player.addListener(playerListener)
     }
 
     val isPlaying: Boolean get() = player.isPlaying
@@ -149,7 +156,10 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
             )
             .build()
 
-    /** Re-creates the playlist with a new effect list (the safe way to change preview effects). */
+    /**
+     * Effects can only be changed safely before a player is prepared, so a new look means a fresh player
+     * that continues from the current position.
+     */
     private fun rebuild(effects: List<androidx.media3.common.Effect>) {
         val items = project.main.map { mediaItem(it) }
         if (items.isEmpty()) return
@@ -157,10 +167,26 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val idx = project.main.indexOf(c).coerceAtLeast(0)
         val pos = ((playheadMs - c.startMs).coerceAtLeast(0L) * c.speed).toLong()
         val play = player.playWhenReady
-        player.setVideoEffects(effects)
-        player.setMediaItems(items, idx, pos)
-        player.prepare()
-        player.playWhenReady = play
+        val old = player
+        val fresh = ExoPlayer.Builder(ctx).build()
+        try {
+            fresh.setVideoEffects(effects)
+        } catch (e: Exception) {
+            listener?.onProblem("Effect not supported: ${e.message}")
+            effectsOk = false
+            appliedFx = "off"
+            fresh.setVideoEffects(emptyList())
+        }
+        fresh.addListener(playerListener)
+        fresh.setMediaItems(items, idx, pos)
+        fresh.playbackParameters = PlaybackParameters(c.speed)
+        fresh.volume = c.volume
+        fresh.prepare()
+        fresh.playWhenReady = play
+        player = fresh
+        onPlayerReplaced?.invoke(fresh)
+        old.removeListener(playerListener)
+        old.release()
     }
 
     /** Applies speed, volume and effects of the clip under the playhead. */
