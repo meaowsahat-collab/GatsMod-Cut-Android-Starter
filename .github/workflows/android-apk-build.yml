@@ -38,10 +38,9 @@ jobs:
           echo "Version $NAME (code $GITHUB_RUN_NUMBER)"
       - name: Build signed APK
         run: gradle assembleRelease -PappVersionName="${{ steps.ver.outputs.name }}" -PappVersionCode="${{ steps.ver.outputs.code }}"
-      - name: Name the APK and show its signature
+      - name: Name the APK
         run: |
           cp app/build/outputs/apk/release/app-release.apk "GatsMod-Cut-${{ steps.ver.outputs.name }}.apk"
-          keytool -printcert -jarfile "GatsMod-Cut-${{ steps.ver.outputs.name }}.apk" | grep -E "Owner|SHA256"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
