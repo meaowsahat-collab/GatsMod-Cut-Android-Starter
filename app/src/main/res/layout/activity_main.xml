@@ -3,106 +3,87 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0E0B1A"
+    android:background="#000000"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <!-- Top bar -->
-    <FrameLayout
+    <!-- Top bar: close, settings, resolution, Export -->
+    <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="48dp">
+        android:layout_height="52dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="10dp">
 
         <ImageButton
             android:id="@+id/menuButton"
             android:layout_width="44dp"
             android:layout_height="44dp"
-            android:layout_gravity="start|center_vertical"
-            android:layout_marginStart="6dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Menu"
+            android:contentDescription="Close"
             android:scaleType="center"
-            android:src="@drawable/ic_menu" />
+            android:src="@drawable/ic_close" />
 
-        <LinearLayout
+        <ImageButton
+            android:id="@+id/settingsButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Settings and updates"
+            android:scaleType="center"
+            android:src="@drawable/ic_gear" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/resChip"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_height="34dp"
+            android:background="@drawable/bg_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="1080P ▾"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:src="@drawable/ic_cutscissor" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="GatsMod Cut"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold|italic" />
-        </LinearLayout>
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/exportButton"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="end|center_vertical"
-            android:layout_marginEnd="8dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_height="34dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_export"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="Export"
+            android:textColor="#000000"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
-            <TextView
-                android:id="@+id/versionChip"
-                android:layout_width="wrap_content"
-                android:layout_height="30dp"
-                android:background="@drawable/bg_chip"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:text="Update"
-                android:textColor="#FFD166"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/settingsButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Settings"
-                android:scaleType="center"
-                android:src="@drawable/ic_gear" />
-        </LinearLayout>
-    </FrameLayout>
-
-    <!-- Rail + preview + export panel -->
-    <LinearLayout
+    <!-- Preview -->
+    <FrameLayout
         android:id="@+id/editorRow"
         android:layout_width="match_parent"
-        android:layout_height="170dp"
-        android:orientation="horizontal"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp">
-
-        <LinearLayout
-            android:id="@+id/rail"
-            android:layout_width="50dp"
-            android:layout_height="match_parent"
-            android:orientation="vertical" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#000000">
 
         <FrameLayout
             android:id="@+id/previewFrame"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:background="#000000">
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
             <androidx.media3.ui.PlayerView
                 android:id="@+id/playerView"
@@ -128,8 +109,8 @@
                 android:padding="12dp">
 
                 <ImageView
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:src="@drawable/ic_add" />
 
                 <TextView
@@ -141,23 +122,54 @@
                     android:textSize="12sp" />
             </LinearLayout>
         </FrameLayout>
+    </FrameLayout>
 
-        <LinearLayout
-            android:id="@+id/rightCol"
-            android:layout_width="84dp"
-            android:layout_height="match_parent"
-            android:orientation="vertical" />
-    </LinearLayout>
-
-    <!-- Player controls -->
+    <!-- Player controls: fullscreen, play, keyframe, undo, redo -->
     <LinearLayout
         android:id="@+id/controls"
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="44dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="62dp"
-        android:paddingEnd="96dp">
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
+
+        <ImageButton
+            android:id="@+id/fullscreenButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Fullscreen preview"
+            android:scaleType="center"
+            android:src="@drawable/ic_fullscreen" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/playButton"
+            android:layout_width="48dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Play or pause"
+            android:scaleType="center"
+            android:src="@drawable/ic_play" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/keyframeButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Keyframe"
+            android:scaleType="center"
+            android:src="@drawable/ic_keyframe" />
 
         <ImageButton
             android:id="@+id/undoButton"
@@ -176,34 +188,6 @@
             android:contentDescription="Redo"
             android:scaleType="center"
             android:src="@drawable/ic_redo" />
-
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
-
-        <ImageButton
-            android:id="@+id/playButton"
-            android:layout_width="44dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Play or pause"
-            android:scaleType="center"
-            android:src="@drawable/ic_play" />
-
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
-
-        <ImageButton
-            android:id="@+id/fullscreenButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Fullscreen preview"
-            android:scaleType="center"
-            android:src="@drawable/ic_fullscreen" />
     </LinearLayout>
 
     <!-- Timeline -->
@@ -217,7 +201,7 @@
             android:id="@+id/timeLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="12dp"
+            android:paddingStart="14dp"
             android:paddingBottom="2dp"
             android:text="00:00 / 00:00"
             android:textColor="#E6E6EA"
@@ -226,32 +210,32 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="148dp"
+            android:layout_height="168dp"
             android:orientation="horizontal">
 
             <LinearLayout
                 android:id="@+id/muteBox"
-                android:layout_width="58dp"
+                android:layout_width="62dp"
                 android:layout_height="match_parent"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingTop="56dp">
+                android:paddingTop="62dp">
 
                 <ImageView
                     android:id="@+id/muteIcon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:src="@drawable/ic_volume" />
 
                 <TextView
                     android:id="@+id/muteLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Mute"
-                    android:textColor="#C9C6DA"
-                    android:textSize="11sp" />
+                    android:text="Mute clip"
+                    android:textColor="#C9C9D0"
+                    android:textSize="10sp" />
             </LinearLayout>
 
             <FrameLayout
@@ -269,9 +253,9 @@
                     android:layout_width="38dp"
                     android:layout_height="38dp"
                     android:layout_gravity="end|top"
-                    android:layout_marginTop="30dp"
+                    android:layout_marginTop="34dp"
                     android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_rail_on"
+                    android:background="@drawable/bg_tile"
                     android:contentDescription="Add video"
                     android:scaleType="center"
                     android:src="@drawable/ic_add" />
@@ -279,29 +263,20 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- All tools, grouped like the reference -->
-    <ScrollView
-        android:id="@+id/toolsScroll"
+    <!-- One scrolling tool row, like CapCut -->
+    <HorizontalScrollView
+        android:id="@+id/toolbarScroll"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="68dp"
+        android:background="#0A0A0C"
         android:scrollbars="none">
 
         <LinearLayout
-            android:id="@+id/toolsContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="4dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="4dp"
-            android:paddingBottom="10dp" />
-    </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/bottomNav"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@drawable/bg_nav"
-        android:orientation="horizontal" />
+            android:id="@+id/toolbarRow"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp" />
+    </HorizontalScrollView>
 </LinearLayout>

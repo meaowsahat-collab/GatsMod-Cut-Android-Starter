@@ -52,8 +52,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var emptyPreview: View
     private lateinit var muteIcon: ImageView
     private lateinit var muteLabel: TextView
-    private lateinit var resRows: List<Pair<Int, TextView>>
-    private lateinit var fpsLabel: TextView
 
     private var resShort = 1080
     private var fps = 30
@@ -120,20 +118,22 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.fullscreenButton).setOnClickListener { toggleFullscreen() }
         findViewById<View>(R.id.muteBox).setOnClickListener { toggleMute() }
-        findViewById<View>(R.id.menuButton).setOnClickListener { projectDialog() }
+        findViewById<View>(R.id.menuButton).setOnClickListener {
+            sheet("Close editor?", label("Your edit is not saved as a project yet. Export first if you want to keep it."),
+                button("Close editor") { finish() })
+        }
         findViewById<View>(R.id.settingsButton).setOnClickListener { aboutDialog() }
-        val chip = findViewById<TextView>(R.id.versionChip)
-        chip.text = "v${versionName()} · Update"
-        chip.setOnClickListener { updater.check(false) }
-
-        buildRail()
-        buildRightColumn()
-        buildTools()
-        buildBottomNav()
+        findViewById<View>(R.id.exportButton).setOnClickListener { startExport() }
+        findViewById<View>(R.id.resChip).setOnClickListener { exportSettingsDialog() }
+        findViewById<View>(R.id.keyframeButton).setOnClickListener { keyframeDialog() }
+        refreshRes()
+        buildToolbar()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (fullscreen) toggleFullscreen() else finish()
+                if (fullscreen) toggleFullscreen()
+                else if (project.selected() != null) { project.selectedId = -1L; syncUi() }
+                else finish()
             }
         })
 
@@ -182,12 +182,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun syncUi() {
+        if (toolbarKeyNow() != toolbarKey) buildToolbar()
         emptyPreview.visibility = if (project.isEmpty()) View.VISIBLE else View.GONE
         overlayView.canvasAspect = project.effectiveAspect()
         val c = project.selected() ?: project.mainClipAt(engine.playheadMs)
         val muted = c != null && c.volume <= 0.001f
         muteIcon.setImageResource(if (muted) R.drawable.ic_mute else R.drawable.ic_volume)
-        muteLabel.text = if (muted) "Unmute" else "Mute"
+        muteLabel.text = if (muted) "Unmute clip" else "Mute clip"
         syncPlayhead()
         timeline.invalidate()
         overlayView.invalidate()
@@ -273,48 +274,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ============================================================ UI building blocks
-
-    private fun tile(icon: Int, label: String, accent: Boolean = false, onClick: () -> Unit): View {
-        val l = LinearLayout(this)
-        l.orientation = LinearLayout.VERTICAL
-        l.gravity = Gravity.CENTER
-        l.setBackgroundResource(if (accent) R.drawable.bg_tile_accent else R.drawable.bg_tile)
-        l.isClickable = true
-        l.isFocusable = true
-        l.layoutParams = LinearLayout.LayoutParams(dp(66), dp(62)).apply { setMargins(dp(3), dp(3), dp(3), dp(3)) }
-        l.setOnClickListener { onClick() }
-        val iv = ImageView(this)
-        iv.setImageResource(icon)
-        iv.layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
-        l.addView(iv)
-        val tv = TextView(this)
-        tv.text = label
-        tv.setTextColor(0xFFDAD7EA.toInt())
-        tv.textSize = 10f
-        tv.gravity = Gravity.CENTER
-        tv.maxLines = 1
-        tv.setPadding(0, dp(3), 0, 0)
-        l.addView(tv)
-        return l
-    }
-
-    private fun section(title: String, tiles: List<View>) {
-        val box = findViewById<LinearLayout>(R.id.toolsContainer)
-        val t = TextView(this)
-        t.text = title
-        t.setTextColor(0xFFFFFFFF.toInt())
-        t.textSize = 13f
-        t.setTypeface(null, Typeface.BOLD)
-        t.setPadding(dp(8), dp(8), 0, dp(2))
-        box.addView(t)
-        val hs = HorizontalScrollView(this)
-        hs.isHorizontalScrollBarEnabled = false
-        val row = LinearLayout(this)
-        row.orientation = LinearLayout.HORIZONTAL
-        tiles.forEach { row.addView(it) }
-        hs.addView(row)
-        box.addView(hs)
-    }
 
     private fun slider(name: String, min: Float, max: Float, value: Float, fmt: (Float) -> String, onChange: (Float) -> Unit): View {
         val box = LinearLayout(this)
@@ -472,197 +431,142 @@ class MainActivity : AppCompatActivity() {
 
     private fun live() { engine.refresh(); timeline.invalidate() }
 
-    // ============================================================ rail / right column / nav
+    // ============================================================ bottom tool row (CapCut style)
 
-    private fun railItem(icon: Int, name: String, accent: Boolean, onClick: () -> Unit): View {
+    private class T(val icon: Int, val name: String, val act: () -> Unit)
+
+    private var toolbarKey = "?"
+
+    private fun toolItem(t: T, back: Boolean = false): View {
         val l = LinearLayout(this)
         l.orientation = LinearLayout.VERTICAL
         l.gravity = Gravity.CENTER
-        if (accent) l.setBackgroundResource(R.drawable.bg_rail_on)
         l.isClickable = true
         l.isFocusable = true
-        l.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
-        l.setOnClickListener { onClick() }
+        l.layoutParams = LinearLayout.LayoutParams(if (back) dp(46) else dp(66), ViewGroup.LayoutParams.MATCH_PARENT)
+        l.setOnClickListener { t.act() }
         val iv = ImageView(this)
-        iv.setImageResource(icon)
-        iv.layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+        iv.setImageResource(t.icon)
+        if (back) iv.rotation = 90f
+        iv.layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
         l.addView(iv)
-        val tv = TextView(this)
-        tv.text = name
-        tv.textSize = 9f
-        tv.setTextColor(0xFFDAD7EA.toInt())
-        tv.gravity = Gravity.CENTER
-        l.addView(tv)
+        if (!back) {
+            val tv = TextView(this)
+            tv.text = t.name
+            tv.textSize = 10f
+            tv.setTextColor(0xFFE6E6EA.toInt())
+            tv.gravity = Gravity.CENTER
+            tv.maxLines = 1
+            tv.setPadding(0, dp(4), 0, 0)
+            l.addView(tv)
+        }
         return l
     }
 
-    private fun buildRail() {
-        val rail = findViewById<LinearLayout>(R.id.rail)
-        rail.addView(railItem(R.drawable.ic_media, "Media", true) { pickVideo() })
-        rail.addView(railItem(R.drawable.ic_audio, "Audio", false) { audioPicker.launch(arrayOf("audio/*")) })
-        rail.addView(railItem(R.drawable.ic_text, "Text", false) { textDialog() })
-        rail.addView(railItem(R.drawable.ic_stickers, "Stickers", false) { stickerDialog() })
-        rail.addView(railItem(R.drawable.ic_effects, "Effects", false) { effectsDialog() })
+    private fun mainTools(): List<T> = listOf(
+        T(R.drawable.ic_cut, "Edit") { val c = need(); if (c != null) syncUi() },
+        T(R.drawable.ic_audio, "Audio") { audioPicker.launch(arrayOf("audio/*")) },
+        T(R.drawable.ic_text, "Text") { textDialog() },
+        T(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
+        T(R.drawable.ic_captions, "Captions") { srtPicker.launch(arrayOf("*/*")) },
+        T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
+        T(R.drawable.ic_effects, "Effects") { effectsDialog() },
+        T(R.drawable.ic_filters, "Filters") { filtersDialog() },
+        T(R.drawable.ic_canvas, "Canvas") { canvasDialog() },
+        T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
+        T(R.drawable.ic_autocap, "Auto captions") { soon("Auto captions") },
+        T(R.drawable.ic_star, "Templates") { soon("Templates") }
+    )
+
+    private fun clipTools(c: Clip): List<T> {
+        val split = T(R.drawable.ic_split, "Split") { doCut() }
+        val dup = T(R.drawable.ic_dup, "Duplicate") { engine.pause(); result(project.duplicate()) }
+        val del = T(R.drawable.ic_delete, "Delete") { engine.pause(); result(project.delete()) }
+        val trimS = T(R.drawable.ic_trim, "Trim start") { doTrim(true) }
+        val trimE = T(R.drawable.ic_trim, "Trim end") { doTrim(false) }
+        return when (c.kind) {
+            LaneKind.VIDEO -> listOf(
+                split,
+                T(R.drawable.ic_speed, "Speed") { speedDialog() },
+                T(R.drawable.ic_animation, "Animations") { animationDialog() },
+                T(R.drawable.ic_volume, "Volume") { volumeDialog() },
+                T(R.drawable.ic_effects, "Effects") { effectsDialog() },
+                T(R.drawable.ic_filters, "Filters") { filtersDialog() },
+                T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
+                T(R.drawable.ic_hsl, "HSL") { hslDialog() },
+                T(R.drawable.ic_crop, "Crop") { cropDialog() },
+                T(R.drawable.ic_rotate, "Rotate") { rotate() },
+                T(R.drawable.ic_flip, "Flip") { flipDialog() },
+                T(R.drawable.ic_keyframe, "Keyframe") { keyframeDialog() },
+                T(R.drawable.ic_chroma, "Chroma key") { chromaDialog() },
+                T(R.drawable.ic_blur, "Blur") { blurDialog() },
+                T(R.drawable.ic_extract, "Extract audio") { extractAudio() },
+                trimS, trimE,
+                T(R.drawable.ic_merge, "Merge") { engine.pause(); result(project.merge()) },
+                dup, del,
+                T(R.drawable.ic_frameback, "Frame back") { step(-1) },
+                T(R.drawable.ic_frameforward, "Frame next") { step(1) },
+                T(R.drawable.ic_reverse, "Reverse") { soon("Reverse") },
+                T(R.drawable.ic_freeze, "Freeze") { soon("Freeze frame") },
+                T(R.drawable.ic_mask, "Mask") { soon("Mask") },
+                T(R.drawable.ic_removebg, "Remove BG") { soon("Remove background") },
+                T(R.drawable.ic_stabilize, "Stabilize") { soon("Stabilize") }
+            )
+            LaneKind.AUDIO -> listOf(
+                split,
+                T(R.drawable.ic_volume, "Volume") { volumeDialog() },
+                T(R.drawable.ic_speed, "Speed") { speedDialog() },
+                trimS, trimE, dup, del
+            )
+            LaneKind.TEXT -> listOf(
+                T(R.drawable.ic_text, "Edit") { textDialog() },
+                split, dup, del
+            )
+            LaneKind.OVERLAY -> listOf(
+                T(R.drawable.ic_resize, "Size") { overlaySizeDialog() },
+                split, dup, del
+            )
+        }
     }
 
-    private fun buildRightColumn() {
-        val col = findViewById<LinearLayout>(R.id.rightCol)
-        val export = LinearLayout(this)
-        export.orientation = LinearLayout.HORIZONTAL
-        export.gravity = Gravity.CENTER
-        export.setBackgroundResource(R.drawable.bg_export)
-        export.isClickable = true
-        export.isFocusable = true
-        export.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36))
-        export.setOnClickListener { startExport() }
-        val ei = ImageView(this)
-        ei.setImageResource(R.drawable.ic_export)
-        ei.layoutParams = LinearLayout.LayoutParams(dp(16), dp(16))
-        val et = TextView(this)
-        et.text = "Export"
-        et.setTextColor(Color.WHITE)
-        et.textSize = 13f
-        et.setTypeface(null, Typeface.BOLD)
-        et.setPadding(dp(5), 0, 0, 0)
-        export.addView(ei)
-        export.addView(et)
-        col.addView(export)
-
-        val sizes = listOf("720P" to 720, "1080P" to 1080, "4K" to 2160)
-        val rows = ArrayList<Pair<Int, TextView>>()
-        sizes.forEach { (name, short) ->
-            val t = TextView(this)
-            t.text = name
-            t.textSize = 12f
-            t.gravity = Gravity.CENTER_VERTICAL
-            t.setPadding(dp(10), 0, dp(6), 0)
-            t.setBackgroundResource(R.drawable.bg_chip)
-            t.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28)).apply { topMargin = dp(5) }
-            t.setOnClickListener { resShort = short; refreshRes() }
-            rows.add(short to t)
-            col.addView(t)
-        }
-        resRows = rows
-
-        fpsLabel = TextView(this)
-        fpsLabel.textSize = 12f
-        fpsLabel.gravity = Gravity.CENTER_VERTICAL
-        fpsLabel.setTextColor(Color.WHITE)
-        fpsLabel.setPadding(dp(10), 0, dp(6), 0)
-        fpsLabel.setBackgroundResource(R.drawable.bg_chip)
-        fpsLabel.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28)).apply { topMargin = dp(5) }
-        fpsLabel.setOnClickListener {
-            val opts = listOf(24, 30, 60)
-            sheet("Frame rate", chips(opts.map { "$it fps" }, opts.indexOf(fps)) { fps = opts[it]; refreshRes() },
-                label("Frames are only dropped, never invented: a 30 fps video stays 30 fps even if you pick 60."))
-        }
-        col.addView(fpsLabel)
-
-        val hdr = TextView(this)
-        hdr.text = "HDR  Off"
-        hdr.textSize = 12f
-        hdr.gravity = Gravity.CENTER_VERTICAL
-        hdr.setTextColor(0xFF9A96B5.toInt())
-        hdr.setPadding(dp(10), 0, dp(6), 0)
-        hdr.setBackgroundResource(R.drawable.bg_chip)
-        hdr.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28)).apply { topMargin = dp(5) }
-        hdr.setOnClickListener { soon("HDR export") }
-        col.addView(hdr)
-        refreshRes()
+    private fun overlaySizeDialog() {
+        val c = project.selected() ?: return
+        project.checkpoint()
+        sheet("Size", slider("Size", 0.05f, 1f, c.sizeFrac, { "%d%%".format((it * 100).toInt()) }) { c.sizeFrac = it; overlayView.invalidate() },
+            label("Drag the picture in the preview to move it."), onClose = { afterEdit() })
     }
+
+    private fun buildToolbar() {
+        val row = findViewById<LinearLayout>(R.id.toolbarRow)
+        row.removeAllViews()
+        val sel = project.selected()
+        if (sel == null) {
+            mainTools().forEach { row.addView(toolItem(it)) }
+        } else {
+            row.addView(toolItem(T(R.drawable.ic_chevron, "Back") { project.selectedId = -1L; syncUi() }, back = true))
+            clipTools(sel).forEach { row.addView(toolItem(it)) }
+        }
+        toolbarKey = toolbarKeyNow()
+        findViewById<View>(R.id.toolbarScroll).scrollTo(0, 0)
+    }
+
+    private fun toolbarKeyNow(): String = project.selected()?.kind?.name ?: "none"
 
     private fun refreshRes() {
-        resRows.forEach { (short, tv) ->
-            val on = short == resShort
-            tv.setTextColor(if (on) 0xFFFFD166.toInt() else 0xFFFFFFFF.toInt())
-            val base = when (short) { 720 -> "720P"; 1080 -> "1080P"; else -> "4K" }
-            tv.text = if (on) "$base  ✓" else base
-        }
-        fpsLabel.text = "$fps fps  ▾"
+        val base = when (resShort) { 720 -> "720P"; 1080 -> "1080P"; else -> "4K" }
+        findViewById<TextView>(R.id.resChip).text = "$base ▾"
     }
 
-    private fun buildBottomNav() {
-        val nav = findViewById<LinearLayout>(R.id.bottomNav)
-        fun item(icon: Int, name: String, accent: Boolean, click: () -> Unit) {
-            val l = LinearLayout(this)
-            l.orientation = LinearLayout.VERTICAL
-            l.gravity = Gravity.CENTER
-            l.isClickable = true
-            l.isFocusable = true
-            l.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
-            l.setOnClickListener { click() }
-            val iv = ImageView(this)
-            iv.setImageResource(icon)
-            iv.layoutParams = LinearLayout.LayoutParams(if (accent) dp(30) else dp(22), if (accent) dp(30) else dp(22))
-            l.addView(iv)
-            val tv = TextView(this)
-            tv.text = name
-            tv.textSize = 10f
-            tv.setTextColor(if (accent) 0xFFFFFFFF.toInt() else 0xFFB9B5D0.toInt())
-            l.addView(tv)
-            nav.addView(l)
-        }
-        item(R.drawable.ic_home, "Home", false) { findViewById<View>(R.id.toolsScroll).scrollTo(0, 0) }
-        item(R.drawable.ic_folder, "Project", false) { projectDialog() }
-        item(R.drawable.ic_add, "Import", true) { pickVideo() }
-        item(R.drawable.ic_star, "Template", false) { soon("Templates") }
-        item(R.drawable.ic_person, "Me", false) { aboutDialog() }
-    }
-
-    // ============================================================ tool rows
-
-    private fun buildTools() {
-        section("Edit", listOf(
-            tile(R.drawable.ic_split, "Cut", true) { doCut() },
-            tile(R.drawable.ic_trim, "Trim start") { doTrim(true) },
-            tile(R.drawable.ic_trim, "Trim end") { doTrim(false) },
-            tile(R.drawable.ic_merge, "Merge") { engine.pause(); result(project.merge()) },
-            tile(R.drawable.ic_dup, "Duplicate") { engine.pause(); result(project.duplicate()) },
-            tile(R.drawable.ic_delete, "Delete") { engine.pause(); result(project.delete()) },
-            tile(R.drawable.ic_speed, "Speed") { speedDialog() },
-            tile(R.drawable.ic_volume, "Volume") { volumeDialog() },
-            tile(R.drawable.ic_frameback, "Frame ◀") { step(-1) },
-            tile(R.drawable.ic_frameforward, "Frame ▶") { step(1) },
-            tile(R.drawable.ic_zoom, "Zoom +") { timeline.zoomIn() },
-            tile(R.drawable.ic_zoom, "Zoom −") { timeline.zoomOut() }
-        ))
-        section("Picture", listOf(
-            tile(R.drawable.ic_crop, "Crop") { cropDialog() },
-            tile(R.drawable.ic_rotate, "Rotate") { rotate() },
-            tile(R.drawable.ic_flip, "Flip") { flipDialog() },
-            tile(R.drawable.ic_canvas, "Canvas") { canvasDialog() },
-            tile(R.drawable.ic_keyframe, "Keyframe") { keyframeDialog() },
-            tile(R.drawable.ic_animation, "Animation") { animationDialog() },
-            tile(R.drawable.ic_reverse, "Reverse") { soon("Reverse") },
-            tile(R.drawable.ic_freeze, "Freeze") { soon("Freeze frame") }
-        ))
-        section("Look", listOf(
-            tile(R.drawable.ic_filters, "Filters") { filtersDialog() },
-            tile(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
-            tile(R.drawable.ic_hsl, "HSL") { hslDialog() },
-            tile(R.drawable.ic_effects, "Effects") { effectsDialog() },
-            tile(R.drawable.ic_blur, "Blur") { blurDialog() },
-            tile(R.drawable.ic_chroma, "Chroma Key") { chromaDialog() },
-            tile(R.drawable.ic_mask, "Mask") { soon("Mask") },
-            tile(R.drawable.ic_blend, "Blend") { soon("Blend") },
-            tile(R.drawable.ic_removebg, "Remove BG") { soon("Remove background") },
-            tile(R.drawable.ic_stabilize, "Stabilize") { soon("Stabilize") }
-        ))
-        section("Text & stickers", listOf(
-            tile(R.drawable.ic_text, "Text") { textDialog() },
-            tile(R.drawable.ic_captions, "Captions") { srtPicker.launch(arrayOf("*/*")) },
-            tile(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
-            tile(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
-            tile(R.drawable.ic_autocap, "Auto captions") { soon("Auto captions") }
-        ))
-        section("Audio", listOf(
-            tile(R.drawable.ic_music, "Music") { audioPicker.launch(arrayOf("audio/*")) },
-            tile(R.drawable.ic_extract, "Extract") { extractAudio() },
-            tile(R.drawable.ic_mute, "Mute") { toggleMute() },
-            tile(R.drawable.ic_mic, "Voiceover") { soon("Voiceover") },
-            tile(R.drawable.ic_noise, "Noise") { soon("Noise reduction") },
-            tile(R.drawable.ic_beat, "Beats") { soon("Beat sync") }
-        ))
+    private fun exportSettingsDialog() {
+        val sizes = listOf(720, 1080, 2160)
+        val opts = listOf(24, 30, 60)
+        sheet("Export settings",
+            label("Resolution"),
+            chips(listOf("720P", "1080P", "4K"), sizes.indexOf(resShort)) { resShort = sizes[it]; refreshRes() },
+            label("Frame rate"),
+            chips(opts.map { "$it fps" }, opts.indexOf(fps)) { fps = opts[it]; refreshRes() },
+            label("Frames are only dropped, never invented: a 30 fps video stays 30 fps even if you pick 60."),
+            label("HDR export is coming soon."))
     }
 
     // ============================================================ edit tools
@@ -946,17 +850,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun aboutDialog() {
-        sheet("GatsMod Cut", label("Version ${versionName()}"), button("Check for updates") { updater.check(false) })
+        sheet("GatsMod Cut", label("Version ${versionName()}"), button("Check for updates") { updater.check(false) },
+            button("Project info") { projectDialog() })
     }
 
     private fun toggleFullscreen() {
         fullscreen = !fullscreen
         val vis = if (fullscreen) View.GONE else View.VISIBLE
-        listOf(R.id.topBar, R.id.rail, R.id.rightCol, R.id.timelineBlock, R.id.toolsScroll, R.id.bottomNav).forEach { findViewById<View>(it).visibility = vis }
-        val row = findViewById<View>(R.id.editorRow)
-        val lp = row.layoutParams as LinearLayout.LayoutParams
-        if (fullscreen) { lp.height = 0; lp.weight = 1f } else { lp.height = dp(170); lp.weight = 0f }
-        row.layoutParams = lp
+        listOf(R.id.topBar, R.id.timelineBlock, R.id.toolbarScroll).forEach { findViewById<View>(it).visibility = vis }
         val c = WindowInsetsControllerCompat(window, window.decorView)
         if (fullscreen) {
             c.hide(WindowInsetsCompat.Type.systemBars())
