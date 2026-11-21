@@ -14,7 +14,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.AttributeSet
-import android.util.Size
+import androidx.media3.common.util.Size
 import android.view.MotionEvent
 import android.view.View
 import androidx.media3.common.util.UnstableApi

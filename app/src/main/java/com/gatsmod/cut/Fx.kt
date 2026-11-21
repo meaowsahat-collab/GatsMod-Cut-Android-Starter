@@ -3,7 +3,7 @@
 package com.gatsmod.cut
 
 import android.graphics.Matrix
-import android.util.Size
+import androidx.media3.common.util.Size
 import androidx.media3.common.C
 import androidx.media3.common.Effect
 import androidx.media3.common.audio.AudioProcessor
