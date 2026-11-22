@@ -85,6 +85,10 @@ object Fx {
     fun previewEffects(c: Clip, localMs: () -> Long): List<Effect> {
         val l = lookEffects(c).toMutableList()
         if (c.stab.isNotEmpty()) l.add(KeyframeTransform(c.stab) { c.srcInMs + (localMs() * c.speed).toLong() })
+        if (c.hasAnim) {
+            l.add(AnimTransform(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
+            l.add(AnimGain(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
+        }
         if (c.keyframes.isNotEmpty()) l.add(KeyframeTransform(c.keyframes) { localMs() })
         if (c.fadeInMs > 0 || c.fadeOutMs > 0) l.add(FadeMatrix(c.fadeInMs, c.fadeOutMs, c.lengthMs) { localMs() })
         return l
@@ -92,6 +96,35 @@ object Fx {
 }
 
 /** Fades the picture from / to black. [localMs] gives the position inside the clip (timeline time). */
+/** Moves / scales / rotates the picture for the clip's In, Out and Combo animations. */
+class AnimTransform(private val ai: Int, private val aim: Long, private val ao: Int, private val aom: Long, private val ac: Int,
+                    private val lenMs: Long, private val localMs: (Long) -> Long) : MatrixTransformation {
+    private var aspect = 1f
+    override fun configure(inputWidth: Int, inputHeight: Int): Size {
+        aspect = inputWidth.toFloat() / max(1, inputHeight)
+        return Size(inputWidth, inputHeight)
+    }
+    override fun getMatrix(presentationTimeUs: Long): Matrix {
+        val p = Anim.pose(ai, aim, ao, aom, ac, localMs(presentationTimeUs), lenMs)
+        val m = Matrix()
+        m.setScale(aspect, 1f)
+        m.postRotate(-p.rot)
+        m.postScale(1f / aspect, 1f)
+        m.postScale(p.sx, p.sy)
+        m.postTranslate(p.x, p.y)
+        return m
+    }
+}
+
+/** Brightness part of the animations (fade, flash, blink...). */
+class AnimGain(private val ai: Int, private val aim: Long, private val ao: Int, private val aom: Long, private val ac: Int,
+               private val lenMs: Long, private val localMs: (Long) -> Long) : RgbMatrix {
+    override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray {
+        val g = Anim.pose(ai, aim, ao, aom, ac, localMs(presentationTimeUs), lenMs).gain
+        return floatArrayOf(g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, 1f)
+    }
+}
+
 class FadeMatrix(private val inMs: Long, private val outMs: Long, private val lenMs: Long, private val localMs: (Long) -> Long) : RgbMatrix {
     override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray {
         val g = Fade.gain(localMs(presentationTimeUs), lenMs, inMs, outMs)

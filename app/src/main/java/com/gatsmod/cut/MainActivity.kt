@@ -21,6 +21,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -493,7 +494,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Bottom sheet that leaves the preview visible so changes can be seen live. */
-    private fun sheet(title: String, vararg views: View, onClose: (() -> Unit)? = null): Dialog {
+    private fun sheet(title: String, vararg views: View, onClose: (() -> Unit)? = null, showHeader: Boolean = true): Dialog {
         val d = Dialog(this)
         d.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val root = LinearLayout(this)
@@ -517,7 +518,7 @@ class MainActivity : AppCompatActivity() {
         done.setOnClickListener { d.dismiss() }
         head.addView(t)
         head.addView(done)
-        root.addView(head)
+        if (showHeader) root.addView(head)
         views.forEach { root.addView(it) }
         d.setContentView(root)
         d.setOnDismissListener { onClose?.invoke() }
@@ -1775,20 +1776,167 @@ class MainActivity : AppCompatActivity() {
 
     private fun animationDialog() {
         val c = need(true) ?: return
-        val names = listOf("None", "Zoom in", "Zoom out", "Pan right", "Pan left", "Spin")
-        lookSheet("Animation", c, chips(names, -1) {
-            val end = max(200L, c.lengthMs)
-            c.keyframes = when (it) {
-                1 -> mutableListOf(Keyframe(0, 1f), Keyframe(end, 1.35f))
-                2 -> mutableListOf(Keyframe(0, 1.35f), Keyframe(end, 1f))
-                3 -> mutableListOf(Keyframe(0, 1.25f, -0.15f), Keyframe(end, 1.25f, 0.15f))
-                4 -> mutableListOf(Keyframe(0, 1.25f, 0.15f), Keyframe(end, 1.25f, -0.15f))
-                5 -> mutableListOf(Keyframe(0, 1f, 0f, 0f, 0f), Keyframe(end, 1f, 0f, 0f, 360f))
-                else -> mutableListOf()
+        project.checkpoint()
+        val before = c.paramSig()
+        var tab = 0
+        var cat = 0
+        val white = 0xFFFFFFFF.toInt()
+        val grey = 0xFF8E8E93.toInt()
+        val density = resources.displayMetrics.density
+        val tileW = ((resources.displayMetrics.widthPixels - dp(28)) / 4)
+        var dlg: Dialog? = null
+
+        val grid = android.widget.GridLayout(this)
+        grid.columnCount = 4
+        val scroll = ScrollView(this)
+        scroll.addView(grid)
+        scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(236))
+        val sliderBox = LinearLayout(this)
+        sliderBox.orientation = LinearLayout.VERTICAL
+
+        fun selectedId() = when (tab) { 0 -> c.animIn; 1 -> c.animOut; else -> c.animCombo }
+
+        fun previewIt() {
+            ui.postDelayed({
+                val t = when (tab) { 1 -> max(c.startMs, c.endMs - c.animOutMs - 400); else -> c.startMs }
+                engine.seekTo(t); syncPlayhead(); engine.play()
+            }, 650)
+        }
+
+        fun refreshSlider() {
+            sliderBox.removeAllViews()
+            if (tab == 2 || selectedId() == 0) return
+            val maxMs = min(3000f, c.lengthMs * 0.9f).coerceAtLeast(300f)
+            val cur = (if (tab == 0) c.animInMs else c.animOutMs).toFloat().coerceIn(100f, maxMs)
+            sliderBox.addView(slider("Duration", 100f, maxMs, cur, { "%.1fs".format(it / 1000f) }) {
+                if (tab == 0) c.animInMs = it.toLong() else c.animOutMs = it.toLong()
+                live()
+            })
+        }
+
+        fun items(): List<Pair<Int, AnimDef>> {
+            val key = Anim.CATS[cat]
+            val src: List<Pair<Int, AnimDef>> = when (tab) {
+                0 -> Anim.IN.map { it.id to it }
+                1 -> Anim.OUT.map { it.def.id to it.def }
+                else -> Anim.COMBO.map { it.id to it }
             }
-            live()
+            return src.filter { key in it.second.cats.split(",") }
+        }
+
+        fun tile(id: Int, name: String, glyph: String): View {
+            val box = LinearLayout(this)
+            box.orientation = LinearLayout.VERTICAL
+            box.gravity = Gravity.CENTER_HORIZONTAL
+            box.setPadding(dp(4), dp(4), dp(4), dp(6))
+            val sq = TextView(this)
+            val on = selectedId() == id
+            val bg = android.graphics.drawable.GradientDrawable()
+            bg.cornerRadius = dp(10).toFloat()
+            bg.setColor(if (id == 0) 0xFF3A3A3F.toInt() else 0xFF26262B.toInt())
+            if (on) bg.setStroke(dp(2), white)
+            sq.background = bg
+            sq.gravity = Gravity.CENTER
+            sq.text = if (id == 0) "⊘" else glyph
+            sq.textSize = 26f
+            sq.setTextColor(if (id == 0) grey else 0xFF25F4EE.toInt())
+            val side = tileW - dp(8)
+            sq.layoutParams = LinearLayout.LayoutParams(side, side)
+            val nm = TextView(this)
+            nm.text = name
+            nm.textSize = 11f
+            nm.maxLines = 1
+            nm.gravity = Gravity.CENTER
+            nm.setTextColor(if (on) white else grey)
+            nm.setPadding(0, dp(4), 0, 0)
+            box.addView(sq)
+            box.addView(nm)
+            box.layoutParams = android.widget.GridLayout.LayoutParams().apply { width = tileW; height = ViewGroup.LayoutParams.WRAP_CONTENT }
+            box.setOnClickListener {
+                engine.pause()
+                when (tab) { 0 -> c.animIn = id; 1 -> c.animOut = id; else -> c.animCombo = id }
+                live()
+                refreshGridHolder?.invoke()
+                if (id != 0) previewIt()
+            }
+            return box
+        }
+
+        fun fillGrid() {
+            grid.removeAllViews()
+            grid.addView(tile(0, "None", ""))
+            for ((id, d) in items()) grid.addView(tile(id, d.name, d.glyph))
+            refreshSlider()
+        }
+        refreshGridHolder = ::fillGrid
+
+        val catRow = LinearLayout(this)
+        catRow.orientation = LinearLayout.HORIZONTAL
+        catRow.setPadding(dp(4), dp(8), 0, dp(8))
+        val catViews = ArrayList<TextView>()
+        Anim.CATS.forEachIndexed { i, n ->
+            val t = TextView(this)
+            t.text = n
+            t.textSize = 14f
+            t.setPadding(dp(10), dp(4), dp(14), dp(4))
+            t.setTextColor(if (i == cat) white else grey)
+            t.setOnClickListener {
+                cat = i
+                catViews.forEachIndexed { j, v -> v.setTextColor(if (j == cat) white else grey) }
+                fillGrid()
+            }
+            catViews.add(t)
+            catRow.addView(t)
+        }
+        val catScroll = HorizontalScrollView(this)
+        catScroll.isHorizontalScrollBarEnabled = false
+        catScroll.addView(catRow)
+
+        val tabRow = LinearLayout(this)
+        tabRow.orientation = LinearLayout.HORIZONTAL
+        tabRow.gravity = Gravity.CENTER_VERTICAL
+        val tabViews = ArrayList<TextView>()
+        val bars = ArrayList<View>()
+        listOf("In", "Out", "Combo").forEachIndexed { i, n ->
+            val col = LinearLayout(this)
+            col.orientation = LinearLayout.VERTICAL
+            col.gravity = Gravity.CENTER_HORIZONTAL
+            val t = TextView(this)
+            t.text = n
+            t.textSize = 17f
+            t.setPadding(dp(14), dp(8), dp(14), dp(6))
+            t.setTextColor(if (i == tab) white else grey)
+            val bar = View(this)
+            bar.setBackgroundColor(0xFF25F4EE.toInt())
+            bar.visibility = if (i == tab) View.VISIBLE else View.INVISIBLE
+            bar.layoutParams = LinearLayout.LayoutParams(dp(36), dp(2))
+            col.addView(t); col.addView(bar)
+            col.setOnClickListener {
+                tab = i
+                tabViews.forEachIndexed { j, v -> v.setTextColor(if (j == tab) white else grey) }
+                bars.forEachIndexed { j, v -> v.visibility = if (j == tab) View.VISIBLE else View.INVISIBLE }
+                fillGrid()
+            }
+            tabViews.add(t); bars.add(bar)
+            tabRow.addView(col)
+        }
+        val spacer = View(this)
+        spacer.layoutParams = LinearLayout.LayoutParams(0, 1, 1f)
+        tabRow.addView(spacer)
+        val tick = ImageView(this)
+        tick.setImageResource(R.drawable.ic_check)
+        tick.setPadding(dp(10), dp(8), dp(10), dp(8))
+        tick.setOnClickListener { dlg?.dismiss() }
+        tabRow.addView(tick, LinearLayout.LayoutParams(dp(48), dp(44)))
+
+        fillGrid()
+        dlg = sheet("", tabRow, catScroll, scroll, sliderBox, showHeader = false, onClose = {
+            if (c.paramSig() == before) project.discardCheckpoint()
+            afterEdit()
         })
     }
+
+    private var refreshGridHolder: (() -> Unit)? = null
 
     // ============================================================ text / stickers / captions
 

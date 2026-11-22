@@ -76,8 +76,15 @@ data class Clip(
     var denoise: Float = 0f,
     var beats: List<Long> = emptyList(),
     /** Shake-cancelling keyframes; tMs is SOURCE time so they survive cuts, trims and speed changes. */
-    var stab: List<Keyframe> = emptyList()
+    var stab: List<Keyframe> = emptyList(),
+    /** In / Out / Combo animation ids (see Anim) and the lengths of the In and Out parts. 0 = none. */
+    var animIn: Int = 0,
+    var animInMs: Long = 600,
+    var animOut: Int = 0,
+    var animOutMs: Long = 600,
+    var animCombo: Int = 0
 ) {
+    val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
         get() = if (isMedia) max(1L, ((srcOutMs - srcInMs) / speed).toLong()) else durMs
@@ -88,7 +95,7 @@ data class Clip(
 
     /** Everything that changes how the clip looks/sounds in the preview (not its position). */
     fun paramSig(): String =
-        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|${stab.hashCode()}|" +
+        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|${stab.hashCode()}|$animIn|$animInMs|$animOut|$animOutMs|$animCombo|" +
             "${chroma.enabled}|${chroma.key}|${chroma.similarity}|${chroma.smooth}|${chroma.bg}|" +
             keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }
 }
@@ -260,6 +267,8 @@ class Project {
             c.keyframes = head
             tail.keyframes = rest
         }
+        tail.animIn = 0
+        c.animOut = 0
         lane.add(lane.indexOf(c) + 1, tail)
         if (c.kind == LaneKind.VIDEO) relayout()
         selectedId = c.id

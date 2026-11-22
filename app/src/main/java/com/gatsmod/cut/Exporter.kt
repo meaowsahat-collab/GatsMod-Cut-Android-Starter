@@ -141,6 +141,12 @@ class Exporter(private val ctx: Context) {
                     c.srcInMs + ((t - firstS) / 1000L * c.speed).toLong()
                 })
             }
+            if (c.hasAnim) {
+                var firstA = Long.MIN_VALUE
+                val clock: (Long) -> Long = { t -> if (firstA == Long.MIN_VALUE) firstA = t; (t - firstA) / 1000L }
+                fx.add(AnimTransform(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs, clock))
+                fx.add(AnimGain(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs, clock))
+            }
             if (c.keyframes.isNotEmpty()) {
                 var first = Long.MIN_VALUE
                 fx.add(KeyframeTransform(c.keyframes) { t ->
