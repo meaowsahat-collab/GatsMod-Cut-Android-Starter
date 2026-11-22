@@ -84,6 +84,7 @@ object Fx {
     /** Effects for the live preview. [localMs] returns the playhead position inside this clip. */
     fun previewEffects(c: Clip, localMs: () -> Long): List<Effect> {
         val l = lookEffects(c).toMutableList()
+        if (c.stab.isNotEmpty()) l.add(KeyframeTransform(c.stab) { c.srcInMs + (localMs() * c.speed).toLong() })
         if (c.keyframes.isNotEmpty()) l.add(KeyframeTransform(c.keyframes) { localMs() })
         if (c.fadeInMs > 0 || c.fadeOutMs > 0) l.add(FadeMatrix(c.fadeInMs, c.fadeOutMs, c.lengthMs) { localMs() })
         return l

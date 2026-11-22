@@ -134,6 +134,13 @@ class Exporter(private val ctx: Context) {
             }
             if (c.hasAudio && (c.fadeInMs > 0 || c.fadeOutMs > 0)) audioProcs.add(FadeProcessor(c.volume, c.fadeInMs, c.fadeOutMs, c.lengthMs))
             else if (c.hasAudio && c.volume != 1f) audioProcs.add(VolumeProcessor(c.volume))
+            if (c.stab.isNotEmpty()) {
+                var firstS = Long.MIN_VALUE
+                fx.add(KeyframeTransform(c.stab) { t ->
+                    if (firstS == Long.MIN_VALUE) firstS = t
+                    c.srcInMs + ((t - firstS) / 1000L * c.speed).toLong()
+                })
+            }
             if (c.keyframes.isNotEmpty()) {
                 var first = Long.MIN_VALUE
                 fx.add(KeyframeTransform(c.keyframes) { t ->

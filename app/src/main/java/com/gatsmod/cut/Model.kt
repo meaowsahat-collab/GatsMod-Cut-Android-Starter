@@ -74,7 +74,9 @@ data class Clip(
     var maskX: Float = 0f,
     var maskY: Float = 0f,
     var denoise: Float = 0f,
-    var beats: List<Long> = emptyList()
+    var beats: List<Long> = emptyList(),
+    /** Shake-cancelling keyframes; tMs is SOURCE time so they survive cuts, trims and speed changes. */
+    var stab: List<Keyframe> = emptyList()
 ) {
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
@@ -86,7 +88,7 @@ data class Clip(
 
     /** Everything that changes how the clip looks/sounds in the preview (not its position). */
     fun paramSig(): String =
-        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|" +
+        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|${stab.hashCode()}|" +
             "${chroma.enabled}|${chroma.key}|${chroma.similarity}|${chroma.smooth}|${chroma.bg}|" +
             keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }
 }
@@ -344,6 +346,7 @@ class Project {
         if (!sameSource) return "Only pieces that were cut from the same video (same speed) can be merged"
         checkpoint()
         c.srcOutMs = n.srcOutMs
+        c.stab = if (c.stab.isNotEmpty() && n.stab.isNotEmpty()) (c.stab + n.stab).sortedBy { it.tMs } else emptyList()
         c.keyframes.addAll(n.keyframes.map { it.copy(tMs = it.tMs + c.lengthMs) })
         main.remove(n)
         relayout()

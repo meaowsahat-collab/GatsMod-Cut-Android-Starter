@@ -599,7 +599,7 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_freeze, "Freeze") { freezeFrame() },
                 T(R.drawable.ic_mask, "Mask") { maskDialog() },
                 T(R.drawable.ic_removebg, "Remove BG") { soon("Remove background") },
-                T(R.drawable.ic_stabilize, "Stabilize") { soon("Stabilize") }
+                T(R.drawable.ic_stabilize, "Stabilize") { stabilizeDialog() }
             )
             LaneKind.AUDIO -> listOf(
                 split,
@@ -685,6 +685,65 @@ class MainActivity : AppCompatActivity() {
         engine.pause(); engine.seekTo(t); syncPlayhead()
     }
 
+    private fun stabilizeDialog() {
+        val c = need(true) ?: return
+        val id = c.id
+        val srcLen = c.srcOutMs - c.srcInMs
+        val info = TextView(this).apply { setTextColor(0xFFDAD7EA.toInt()); textSize = 14f }
+        info.text = if (c.stab.isEmpty()) "Not stabilized yet." else "Stabilized. You can analyze again with another strength."
+        var level = 1
+        var dlg: Dialog? = null
+        val lv = chips(listOf("Light", "Normal", "Strong"), level) { level = it }
+        val go = button(if (c.stab.isEmpty()) "Analyze & stabilize" else "Analyze again") {
+            if (srcLen > 60000) { toast("Stabilize works on clips up to 60 s — cut the clip shorter first"); return@button }
+            dlg?.dismiss()
+            val cur = project.byId(id) ?: return@button
+            val uri = cur.uri; val a = cur.srcInMs; val b = cur.srcOutMs
+            val window = intArrayOf(8, 15, 30)[level]
+            runWork("Stabilizing") { progress ->
+                val r = FrameVideo.openRetriever(this, uri) ?: return@runWork null
+                val step = 66L
+                val n = ((b - a) / step).toInt().coerceAtLeast(3)
+                var prev: IntArray? = null
+                var w = 0; var h = 0
+                val moves = ArrayList<FloatArray>()
+                for (i in 0 until n) {
+                    val bmp = FrameVideo.frameAt(r, a + i * step, 160)
+                    if (bmp == null) { if (prev != null) moves.add(floatArrayOf(0f, 0f)); continue }
+                    w = bmp.width; h = bmp.height
+                    val px = IntArray(w * h)
+                    bmp.getPixels(px, 0, w, 0, 0, w, h)
+                    bmp.recycle()
+                    val g = IntArray(w * h) { val p = px[it]; (((p shr 16) and 255) * 3 + ((p shr 8) and 255) * 6 + (p and 255)) / 10 }
+                    val pv = prev
+                    if (pv != null) {
+                        val s = StabMath.shift(pv, g, w, h, max(4, w / 10))
+                        moves.add(floatArrayOf(s[0] / w, s[1] / h))
+                    }
+                    prev = g
+                    if (!progress(i * 100 / n)) { try { r.release() } catch (_: Exception) {}; return@runWork null }
+                }
+                try { r.release() } catch (_: Exception) {}
+                if (moves.size < 3) return@runWork null
+                val keys = StabMath.plan(moves, step, window).map { it.copy(tMs = a + it.tMs) }
+                return@runWork {
+                    project.byId(id)?.let { cl ->
+                        project.checkpoint()
+                        cl.stab = keys
+                        afterEdit()
+                        toast("Stabilized — the picture is zoomed in slightly to hide the edges")
+                    }
+                }
+            }
+        }
+        val off = button("Remove stabilization") {
+            project.byId(id)?.let { project.checkpoint(); it.stab = emptyList(); afterEdit(); toast("Stabilization removed") }
+            dlg?.dismiss()
+        }
+        dlg = sheet("Stabilize", info, label("Strength"), lv, go, off,
+            label("Measures how the picture shakes (up/down/left/right only, no rotation) and cancels it, with a small zoom to hide the edges. It is a simple method, not AI: it works best on handheld shots with a detailed background, and not when something big moves in front of the camera. Analysis takes a while on long clips."))
+    }
+
     private fun denoiseDialog() {
         val c = need() ?: return
         if (!c.isMedia) { toast("Noise reduction works on video and audio clips"); return }
@@ -763,6 +822,7 @@ class MainActivity : AppCompatActivity() {
                     cur.srcOutMs = res.durationMs
                     cur.srcTotalMs = res.durationMs
                     cur.hasAudio = false
+                    cur.stab = emptyList()
                     cur.label = "Reversed"
                     cur.keyframes = cur.keyframes.map { it.copy(tMs = max(0L, cur.lengthMs - it.tMs)) }.sortedBy { it.tMs }.toMutableList()
                     project.relayout()
