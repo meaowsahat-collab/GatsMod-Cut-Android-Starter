@@ -103,6 +103,8 @@ object ProjectStore {
         o.put("posX", c.posX.toDouble()); o.put("posY", c.posY.toDouble()); o.put("bold", c.bold); o.put("font", c.font)
         o.put("durMs", c.durMs)
         o.put("fadeIn", c.fadeInMs); o.put("fadeOut", c.fadeOutMs)
+        o.put("fx", c.fx); o.put("fxAmount", c.fxAmount.toDouble()); o.put("maskShape", c.maskShape); o.put("maskSize", c.maskSize.toDouble())
+        o.put("maskFeather", c.maskFeather.toDouble()); o.put("maskInvert", c.maskInvert); o.put("maskX", c.maskX.toDouble()); o.put("maskY", c.maskY.toDouble())
         return o
     }
 
@@ -135,7 +137,10 @@ object ProjectStore {
                     fps = o.optDouble("fps", 30.0).toFloat(), text = o.optString("text"), color = o.optInt("color", android.graphics.Color.WHITE),
                     sizeFrac = o.optDouble("sizeFrac", 0.06).toFloat(), posX = o.optDouble("posX", 0.5).toFloat(), posY = o.optDouble("posY", 0.85).toFloat(),
                     bold = o.optBoolean("bold", true), font = o.optInt("font"), durMs = o.optLong("durMs", 3000),
-                    fadeInMs = o.optLong("fadeIn"), fadeOutMs = o.optLong("fadeOut")
+                    fadeInMs = o.optLong("fadeIn"), fadeOutMs = o.optLong("fadeOut"),
+                    fx = o.optInt("fx"), fxAmount = o.optDouble("fxAmount", 0.5).toFloat(), maskShape = o.optInt("maskShape"),
+                    maskSize = o.optDouble("maskSize", 0.5).toFloat(), maskFeather = o.optDouble("maskFeather", 0.15).toFloat(),
+                    maskInvert = o.optBoolean("maskInvert"), maskX = o.optDouble("maskX").toFloat(), maskY = o.optDouble("maskY").toFloat()
                 )
             )
         }

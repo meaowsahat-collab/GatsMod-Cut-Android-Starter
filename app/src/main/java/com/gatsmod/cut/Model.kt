@@ -64,7 +64,15 @@ data class Clip(
     var font: Int = 0,
     var durMs: Long = 3000,
     var fadeInMs: Long = 0,
-    var fadeOutMs: Long = 0
+    var fadeOutMs: Long = 0,
+    var fx: Int = 0,
+    var fxAmount: Float = 0.5f,
+    var maskShape: Int = 0,
+    var maskSize: Float = 0.5f,
+    var maskFeather: Float = 0.15f,
+    var maskInvert: Boolean = false,
+    var maskX: Float = 0f,
+    var maskY: Float = 0f
 ) {
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
@@ -76,7 +84,7 @@ data class Clip(
 
     /** Everything that changes how the clip looks/sounds in the preview (not its position). */
     fun paramSig(): String =
-        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|" +
+        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|" +
             "${chroma.enabled}|${chroma.key}|${chroma.similarity}|${chroma.smooth}|${chroma.bg}|" +
             keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }
 }

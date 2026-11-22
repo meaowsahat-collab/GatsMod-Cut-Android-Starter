@@ -588,7 +588,7 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_help, "Info") { clipInfo() },
                 T(R.drawable.ic_reverse, "Reverse") { soon("Reverse") },
                 T(R.drawable.ic_freeze, "Freeze") { soon("Freeze frame") },
-                T(R.drawable.ic_mask, "Mask") { soon("Mask") },
+                T(R.drawable.ic_mask, "Mask") { maskDialog() },
                 T(R.drawable.ic_removebg, "Remove BG") { soon("Remove background") },
                 T(R.drawable.ic_stabilize, "Stabilize") { soon("Stabilize") }
             )
@@ -642,6 +642,7 @@ class MainActivity : AppCompatActivity() {
         c.blur = d.blur; c.temp = d.temp; c.hue = d.hue; c.lum = d.lum; c.cropRatio = d.cropRatio
         c.rotation = d.rotation; c.flipH = false; c.flipV = false
         c.chroma = Chroma(); c.keyframes = mutableListOf(); c.fadeInMs = 0; c.fadeOutMs = 0
+        c.fx = 0; c.maskShape = 0; c.maskInvert = false; c.maskX = 0f; c.maskY = 0f
         toast("Look reset")
         afterEdit()
     }
@@ -1165,10 +1166,21 @@ class MainActivity : AppCompatActivity() {
     private fun effectsDialog() {
         val c = need(true) ?: return
         lookSheet("Effects", c,
-            label("Filter"),
-            chips(Fx.FILTER_NAMES, c.filter) { c.filter = it; live() },
-            slider("Blur", 0f, 25f, c.blur, { "%.0f".format(it) }) { c.blur = it; live() },
-            slider("Contrast", 0.5f, 1.5f, c.contrast, { "%d%%".format((it * 100).toInt()) }) { c.contrast = it; live() })
+            chips(GlFxNames.EFFECTS, c.fx) { c.fx = it; live() },
+            slider("Intensity", 0f, 1f, c.fxAmount, { "%d".format((it * 100).toInt()) }) { c.fxAmount = it; live() },
+            slider("Blur", 0f, 25f, c.blur, { "%.0f".format(it) }) { c.blur = it; live() })
+    }
+
+    private fun maskDialog() {
+        val c = need(true) ?: return
+        lookSheet("Mask", c,
+            chips(GlFxNames.MASKS, c.maskShape) { c.maskShape = it; live() },
+            slider("Size", 0.1f, 2f, c.maskSize, { "%d".format((it * 100).toInt()) }) { c.maskSize = it; live() },
+            slider("Feather", 0f, 1f, c.maskFeather, { "%d".format((it * 100).toInt()) }) { c.maskFeather = it; live() },
+            slider("Position X", -1f, 1f, c.maskX, { "%+d".format((it * 100).toInt()) }) { c.maskX = it; live() },
+            slider("Position Y", -1f, 1f, c.maskY, { "%+d".format((it * 100).toInt()) }) { c.maskY = it; live() },
+            chips(listOf("Show inside", "Show outside"), if (c.maskInvert) 1 else 0) { c.maskInvert = it == 1; live() },
+            label("Everything outside the shape turns black."))
     }
 
     private fun chromaDialog() {

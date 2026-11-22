@@ -75,6 +75,9 @@ object Fx {
             7 -> l.add(RgbFilter.createInvertedFilter())
         }
         if (c.blur > 0.1f) l.add(GaussianBlur(c.blur.coerceAtMost(25f)))
+        if (c.fx != 0 || c.maskShape != 0) {
+            l.add(LookGlEffect(LookParams(c.fx, c.fxAmount, c.maskShape, c.maskSize, c.maskFeather, c.maskInvert, c.maskX, c.maskY)))
+        }
         return l
     }
 
