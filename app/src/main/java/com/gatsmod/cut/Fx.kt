@@ -86,6 +86,10 @@ object Fx {
         val l = lookEffects(c).toMutableList()
         if (c.stab.isNotEmpty()) l.add(KeyframeTransform(c.stab) { c.srcInMs + (localMs() * c.speed).toLong() })
         if (c.hasAnim) {
+            if (Anim.isMask(c.animIn) || Anim.isMask(c.animOut)) {
+                val ai = c.animIn; val aim = c.animInMs; val ao = c.animOut; val aom = c.animOutMs; val len = c.lengthMs
+                l.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f) { Anim.maskState(ai, aim, ao, aom, localMs(), len) }))
+            }
             l.add(AnimTransform(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
             l.add(AnimGain(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
         }

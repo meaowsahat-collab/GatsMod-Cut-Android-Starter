@@ -144,6 +144,10 @@ class Exporter(private val ctx: Context) {
             if (c.hasAnim) {
                 var firstA = Long.MIN_VALUE
                 val clock: (Long) -> Long = { t -> if (firstA == Long.MIN_VALUE) firstA = t; (t - firstA) / 1000L }
+                if (Anim.isMask(c.animIn) || Anim.isMask(c.animOut)) {
+                    val ai = c.animIn; val aim = c.animInMs; val ao = c.animOut; val aom = c.animOutMs; val len = c.lengthMs
+                    fx.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f) { us -> Anim.maskState(ai, aim, ao, aom, clock(us), len) }))
+                }
                 fx.add(AnimTransform(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs, clock))
                 fx.add(AnimGain(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs, clock))
             }

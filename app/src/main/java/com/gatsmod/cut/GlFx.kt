@@ -22,7 +22,9 @@ class LookParams(
     val maskFeather: Float,
     val maskInvert: Boolean,
     val maskX: Float,
-    val maskY: Float
+    val maskY: Float,
+    /** Optional: gives [shape, size] of the mask for a frame time (microseconds) — used by the reveal animations. */
+    val dyn: ((Long) -> FloatArray)? = null
 )
 
 object GlFxNames {
@@ -32,7 +34,7 @@ object GlFxNames {
 
 class LookGlEffect(private val p: LookParams) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = LookProgram(p, useHdr)
-    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = p.effect == 0 && p.mask == 0
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = p.effect == 0 && p.mask == 0 && p.dyn == null
 }
 
 private class LookProgram(private val p: LookParams, useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
@@ -64,8 +66,9 @@ private class LookProgram(private val p: LookParams, useHdr: Boolean) : BaseGlSh
             program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)
             program.setIntUniform("uEffect", p.effect)
             program.setFloatUniform("uAmount", p.amount)
-            program.setIntUniform("uMask", p.mask)
-            program.setFloatUniform("uMaskSize", p.maskSize)
+            val dm = p.dyn?.invoke(presentationTimeUs)
+            program.setIntUniform("uMask", dm?.get(0)?.toInt() ?: p.mask)
+            program.setFloatUniform("uMaskSize", dm?.get(1) ?: p.maskSize)
             program.setFloatUniform("uMaskFeather", p.maskFeather)
             program.setFloatUniform("uMaskInvert", if (p.maskInvert) 1f else 0f)
             program.setFloatsUniform("uMaskPos", floatArrayOf(p.maskX * 0.5f, p.maskY * 0.5f))

@@ -19,7 +19,7 @@ class AnimDef(val id: Int, val name: String, val glyph: String, val cats: String
 
 /** In / Out / Combo animations like CapCut's panel. Everything is a plain function of time, so preview and export match. */
 object Anim {
-    val CATS = listOf("Trending", "Basic", "Light", "Glitch", "3D", "Vibrate")
+    val CATS = listOf("Trending", "Basic", "Light", "Glitch", "Mask", "3D", "Vibrate")
 
     val IN = listOf(
         AnimDef(1, "Zoom In", "⤢", "Trending,Basic"), AnimDef(2, "Pop", "✦", "Trending,Basic"),
@@ -32,7 +32,8 @@ object Anim {
         AnimDef(16, "Stutter In", "▤", "Glitch"), AnimDef(22, "Jitter In", "▦", "Glitch"),
         AnimDef(17, "Flip X", "⇋", "3D"), AnimDef(18, "Flip Y", "⇅", "3D"),
         AnimDef(19, "Swing In", "⌒", "Trending,3D"), AnimDef(20, "Tilt In", "◢", "3D"),
-        AnimDef(15, "Shake In", "≋", "Vibrate"), AnimDef(21, "Vibrate In", "∿", "Vibrate"), AnimDef(23, "Rumble In", "≈", "Vibrate")
+        AnimDef(15, "Shake In", "≋", "Vibrate"), AnimDef(21, "Vibrate In", "∿", "Vibrate"), AnimDef(23, "Rumble In", "≈", "Vibrate"),
+        AnimDef(24, "Circle Reveal", "●", "Trending,Mask"), AnimDef(25, "Square Reveal", "■", "Mask"), AnimDef(26, "Diamond Reveal", "◆", "Mask")
     )
 
     // Out animations replay an In animation backwards; [src] is the In id used.
@@ -49,7 +50,8 @@ object Anim {
         OutDef(AnimDef(1017, "Flip X Out", "⇋", "3D"), 17), OutDef(AnimDef(1018, "Flip Y Out", "⇅", "3D"), 18),
         OutDef(AnimDef(1019, "Swing Out", "⌒", "Trending,3D"), 19), OutDef(AnimDef(1020, "Tilt Out", "◣", "3D"), 20),
         OutDef(AnimDef(1015, "Shake Out", "≋", "Vibrate"), 15), OutDef(AnimDef(1021, "Vibrate Out", "∿", "Vibrate"), 21),
-        OutDef(AnimDef(1023, "Rumble Out", "≈", "Vibrate"), 23)
+        OutDef(AnimDef(1023, "Rumble Out", "≈", "Vibrate"), 23),
+        OutDef(AnimDef(1024, "Circle Close", "●", "Trending,Mask"), 24), OutDef(AnimDef(1025, "Square Close", "■", "Mask"), 25), OutDef(AnimDef(1026, "Diamond Close", "◆", "Mask"), 26)
     )
 
     val COMBO = listOf(
@@ -127,6 +129,28 @@ object Anim {
         }
     }
 
+    fun isMask(id: Int) = id in 24..26 || id in 1024..1026
+
+    private fun durs(animIn: Int, inMs: Long, animOut: Int, outMs: Long, lenMs: Long): LongArray {
+        var a = if (animIn != 0) inMs else 0L
+        var b = if (animOut != 0) outMs else 0L
+        if (a + b > lenMs && a + b > 0) { val k = lenMs.toFloat() / (a + b); a = (a * k).toLong(); b = (b * k).toLong() }
+        return longArrayOf(a, b)
+    }
+
+    /** Shape (0 = none, 1 circle, 2 rectangle, 3 diamond) and size of the reveal mask for the shader at [tMs]. */
+    fun maskState(animIn: Int, inMs: Long, animOut: Int, outMs: Long, tMs: Long, lenMs: Long): FloatArray {
+        val d = durs(animIn, inMs, animOut, outMs, lenMs)
+        var id = 0
+        var p = 1f
+        if (isMask(animIn) && d[0] > 0 && tMs < d[0]) { id = animIn; p = tMs.toFloat() / d[0] }
+        else if (isMask(animOut) && d[1] > 0 && tMs > lenMs - d[1]) { id = outSrc(animOut); p = (lenMs - tMs).toFloat() / d[1] }
+        if (id == 0) return floatArrayOf(0f, 1f)
+        val shape = id - 23                       // 24,25,26 -> 1,2,3
+        val big = if (shape == 2) 1.9f else 2.8f
+        return floatArrayOf(shape.toFloat(), max(0.02f, easeOut(p.coerceIn(0f, 1f)) * big))
+    }
+
     fun outSrc(id: Int): Int = OUT.firstOrNull { it.def.id == id }?.src ?: 0
 
     /**
@@ -134,9 +158,9 @@ object Anim {
      * In and Out lengths are shortened if together they would be longer than the clip.
      */
     fun pose(animIn: Int, inMs: Long, animOut: Int, outMs: Long, combo: Int, tMs: Long, lenMs: Long): Pose {
-        var a = if (animIn != 0) inMs else 0L
-        var b = if (animOut != 0) outMs else 0L
-        if (a + b > lenMs) { val k = lenMs.toFloat() / (a + b); a = (a * k).toLong(); b = (b * k).toLong() }
+        val d = durs(animIn, inMs, animOut, outMs, lenMs)
+        val a = d[0]
+        val b = d[1]
         var p = Pose()
         if (animIn != 0 && a > 0 && tMs < a) p *= inPose(animIn, tMs.toFloat() / a)
         if (animOut != 0 && b > 0 && tMs > lenMs - b) p *= inPose(outSrc(animOut), (lenMs - tMs).toFloat() / b)

@@ -494,7 +494,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Bottom sheet that leaves the preview visible so changes can be seen live. */
-    private fun sheet(title: String, vararg views: View, onClose: (() -> Unit)? = null, showHeader: Boolean = true): Dialog {
+    private fun sheet(title: String, vararg views: View, onClose: (() -> Unit)? = null, showHeader: Boolean = true, heightPx: Int = 0): Dialog {
         val d = Dialog(this)
         d.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val root = LinearLayout(this)
@@ -524,7 +524,7 @@ class MainActivity : AppCompatActivity() {
         d.setOnDismissListener { onClose?.invoke() }
         d.window?.let { w ->
             w.setBackgroundDrawableResource(android.R.color.transparent)
-            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
+            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, if (heightPx > 0) heightPx else WindowManager.LayoutParams.WRAP_CONTENT)
             w.setGravity(Gravity.BOTTOM)
             w.setDimAmount(0.0f)
         }
@@ -1776,23 +1776,54 @@ class MainActivity : AppCompatActivity() {
 
     private fun animationDialog() {
         val c = need(true) ?: return
+        engine.pause()
+        val uri = c.uri; val at = c.srcInMs + min(400L, (c.srcOutMs - c.srcInMs) / 2)
+        Thread {
+            var pic: Bitmap? = null
+            try {
+                val r = FrameVideo.openRetriever(this, uri)
+                val f = r?.let { FrameVideo.frameAt(it, at, 240) }
+                try { r?.release() } catch (_: Exception) {}
+                if (f != null) {
+                    val side = min(f.width, f.height)
+                    pic = Bitmap.createBitmap(f, (f.width - side) / 2, (f.height - side) / 2, side, side)
+                }
+            } catch (_: Throwable) {}
+            runOnUiThread { showAnimationPanel(c, pic) }
+        }.start()
+    }
+
+    private fun showAnimationPanel(c: Clip, pic: Bitmap?) {
+        if (project.byId(c.id) == null) return
         project.checkpoint()
         val before = c.paramSig()
         var tab = 0
         var cat = 0
+        var query = ""
         val white = 0xFFFFFFFF.toInt()
         val grey = 0xFF8E8E93.toInt()
-        val density = resources.displayMetrics.density
-        val tileW = ((resources.displayMetrics.widthPixels - dp(28)) / 4)
+        val tileW = (resources.displayMetrics.widthPixels - dp(24)) / 4
         var dlg: Dialog? = null
+
+        // the panel starts right under the play button row, like CapCut's
+        val loc = IntArray(2)
+        controlsRow().getLocationOnScreen(loc)
+        val content = findViewById<View>(android.R.id.content)
+        val cl = IntArray(2); content.getLocationOnScreen(cl)
+        val panelH = (cl[1] + content.height - (loc[1] + controlsRow().height)).coerceIn(dp(260), dp(520))
 
         val grid = android.widget.GridLayout(this)
         grid.columnCount = 4
-        val scroll = ScrollView(this)
-        scroll.addView(grid)
-        scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(236))
         val sliderBox = LinearLayout(this)
         sliderBox.orientation = LinearLayout.VERTICAL
+        sliderBox.setPadding(dp(8), 0, dp(8), 0)
+        val inner = LinearLayout(this)
+        inner.orientation = LinearLayout.VERTICAL
+        inner.addView(sliderBox)
+        inner.addView(grid)
+        val scroll = ScrollView(this)
+        scroll.addView(inner)
+        scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
 
         fun selectedId() = when (tab) { 0 -> c.animIn; 1 -> c.animOut; else -> c.animCombo }
 
@@ -1815,42 +1846,51 @@ class MainActivity : AppCompatActivity() {
         }
 
         fun items(): List<Pair<Int, AnimDef>> {
-            val key = Anim.CATS[cat]
             val src: List<Pair<Int, AnimDef>> = when (tab) {
                 0 -> Anim.IN.map { it.id to it }
                 1 -> Anim.OUT.map { it.def.id to it.def }
                 else -> Anim.COMBO.map { it.id to it }
             }
+            if (query.isNotBlank()) return src.filter { it.second.name.contains(query.trim(), ignoreCase = true) }
+            val key = Anim.CATS[cat]
             return src.filter { key in it.second.cats.split(",") }
         }
 
-        fun tile(id: Int, name: String, glyph: String): View {
+        fun tile(id: Int, name: String): View {
             val box = LinearLayout(this)
             box.orientation = LinearLayout.VERTICAL
             box.gravity = Gravity.CENTER_HORIZONTAL
-            box.setPadding(dp(4), dp(4), dp(4), dp(6))
-            val sq = TextView(this)
+            box.setPadding(dp(6), dp(6), dp(6), dp(4))
             val on = selectedId() == id
+            val side = tileW - dp(12)
+            val holder = FrameLayout(this)
             val bg = android.graphics.drawable.GradientDrawable()
             bg.cornerRadius = dp(10).toFloat()
             bg.setColor(if (id == 0) 0xFF3A3A3F.toInt() else 0xFF26262B.toInt())
             if (on) bg.setStroke(dp(2), white)
-            sq.background = bg
-            sq.gravity = Gravity.CENTER
-            sq.text = if (id == 0) "⊘" else glyph
-            sq.textSize = 26f
-            sq.setTextColor(if (id == 0) grey else 0xFF25F4EE.toInt())
-            val side = tileW - dp(8)
-            sq.layoutParams = LinearLayout.LayoutParams(side, side)
+            holder.background = bg
+            holder.layoutParams = LinearLayout.LayoutParams(side, side)
+            if (id == 0) {
+                val no = ImageView(this)
+                no.setImageResource(R.drawable.ic_close)
+                no.alpha = 0.7f
+                no.setPadding(side / 3, side / 3, side / 3, side / 3)
+                holder.addView(no, FrameLayout.LayoutParams(side, side))
+            } else {
+                val inset = if (on) dp(2) else 0
+                val tv = AnimTile(this, pic, tab, id, dp(10).toFloat())
+                holder.addView(tv, FrameLayout.LayoutParams(side - inset * 2, side - inset * 2).apply { setMargins(inset, inset, inset, inset) })
+            }
             val nm = TextView(this)
             nm.text = name
-            nm.textSize = 11f
+            nm.textSize = 12f
             nm.maxLines = 1
+            nm.ellipsize = android.text.TextUtils.TruncateAt.END
             nm.gravity = Gravity.CENTER
             nm.setTextColor(if (on) white else grey)
-            nm.setPadding(0, dp(4), 0, 0)
-            box.addView(sq)
-            box.addView(nm)
+            nm.setPadding(0, dp(5), 0, 0)
+            box.addView(holder)
+            box.addView(nm, LinearLayout.LayoutParams(side, ViewGroup.LayoutParams.WRAP_CONTENT))
             box.layoutParams = android.widget.GridLayout.LayoutParams().apply { width = tileW; height = ViewGroup.LayoutParams.WRAP_CONTENT }
             box.setOnClickListener {
                 engine.pause()
@@ -1864,25 +1904,27 @@ class MainActivity : AppCompatActivity() {
 
         fun fillGrid() {
             grid.removeAllViews()
-            grid.addView(tile(0, "None", ""))
-            for ((id, d) in items()) grid.addView(tile(id, d.name, d.glyph))
+            grid.addView(tile(0, "None"))
+            for ((id, d) in items()) grid.addView(tile(id, d.name))
             refreshSlider()
         }
         refreshGridHolder = ::fillGrid
 
         val catRow = LinearLayout(this)
         catRow.orientation = LinearLayout.HORIZONTAL
-        catRow.setPadding(dp(4), dp(8), 0, dp(8))
+        catRow.setPadding(dp(8), dp(6), 0, dp(6))
         val catViews = ArrayList<TextView>()
         Anim.CATS.forEachIndexed { i, n ->
             val t = TextView(this)
             t.text = n
-            t.textSize = 14f
-            t.setPadding(dp(10), dp(4), dp(14), dp(4))
+            t.textSize = 17f
+            t.setPadding(dp(10), dp(6), dp(14), dp(6))
             t.setTextColor(if (i == cat) white else grey)
+            t.setTypeface(null, if (i == cat) Typeface.BOLD else Typeface.NORMAL)
             t.setOnClickListener {
                 cat = i
-                catViews.forEachIndexed { j, v -> v.setTextColor(if (j == cat) white else grey) }
+                query = ""
+                catViews.forEachIndexed { j, v -> v.setTextColor(if (j == cat) white else grey); v.setTypeface(null, if (j == cat) Typeface.BOLD else Typeface.NORMAL) }
                 fillGrid()
             }
             catViews.add(t)
@@ -1892,9 +1934,40 @@ class MainActivity : AppCompatActivity() {
         catScroll.isHorizontalScrollBarEnabled = false
         catScroll.addView(catRow)
 
+        val searchBox = EditText(this)
+        searchBox.hint = "Search animations"
+        searchBox.setHintTextColor(grey)
+        searchBox.setTextColor(white)
+        searchBox.textSize = 15f
+        searchBox.maxLines = 1
+        searchBox.inputType = android.text.InputType.TYPE_CLASS_TEXT
+        searchBox.visibility = View.GONE
+        searchBox.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(e: android.text.Editable?) { query = e?.toString() ?: ""; fillGrid() }
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
+        })
+
         val tabRow = LinearLayout(this)
         tabRow.orientation = LinearLayout.HORIZONTAL
         tabRow.gravity = Gravity.CENTER_VERTICAL
+        val magnifier = ImageView(this)
+        magnifier.setImageResource(R.drawable.ic_search)
+        val circle = android.graphics.drawable.GradientDrawable()
+        circle.shape = android.graphics.drawable.GradientDrawable.OVAL
+        circle.setColor(0xFF2C2C31.toInt())
+        magnifier.background = circle
+        magnifier.setPadding(dp(9), dp(9), dp(9), dp(9))
+        magnifier.setOnClickListener {
+            val show = searchBox.visibility != View.VISIBLE
+            searchBox.visibility = if (show) View.VISIBLE else View.GONE
+            catScroll.visibility = if (show) View.GONE else View.VISIBLE
+            if (!show) { searchBox.setText(""); query = ""; fillGrid() } else searchBox.requestFocus()
+        }
+        tabRow.addView(magnifier, LinearLayout.LayoutParams(dp(36), dp(36)).apply { setMargins(dp(6), 0, dp(10), 0) })
+        val div = View(this)
+        div.setBackgroundColor(0xFF3A3A3F.toInt())
+        tabRow.addView(div, LinearLayout.LayoutParams(dp(1), dp(20)).apply { setMargins(0, 0, dp(6), 0) })
         val tabViews = ArrayList<TextView>()
         val bars = ArrayList<View>()
         listOf("In", "Out", "Combo").forEachIndexed { i, n ->
@@ -1903,9 +1976,10 @@ class MainActivity : AppCompatActivity() {
             col.gravity = Gravity.CENTER_HORIZONTAL
             val t = TextView(this)
             t.text = n
-            t.textSize = 17f
+            t.textSize = 19f
             t.setPadding(dp(14), dp(8), dp(14), dp(6))
             t.setTextColor(if (i == tab) white else grey)
+            t.setTypeface(null, if (i == tab) Typeface.BOLD else Typeface.NORMAL)
             val bar = View(this)
             bar.setBackgroundColor(0xFF25F4EE.toInt())
             bar.visibility = if (i == tab) View.VISIBLE else View.INVISIBLE
@@ -1913,7 +1987,7 @@ class MainActivity : AppCompatActivity() {
             col.addView(t); col.addView(bar)
             col.setOnClickListener {
                 tab = i
-                tabViews.forEachIndexed { j, v -> v.setTextColor(if (j == tab) white else grey) }
+                tabViews.forEachIndexed { j, v -> v.setTextColor(if (j == tab) white else grey); v.setTypeface(null, if (j == tab) Typeface.BOLD else Typeface.NORMAL) }
                 bars.forEachIndexed { j, v -> v.visibility = if (j == tab) View.VISIBLE else View.INVISIBLE }
                 fillGrid()
             }
@@ -1928,13 +2002,17 @@ class MainActivity : AppCompatActivity() {
         tick.setPadding(dp(10), dp(8), dp(10), dp(8))
         tick.setOnClickListener { dlg?.dismiss() }
         tabRow.addView(tick, LinearLayout.LayoutParams(dp(48), dp(44)))
+        val line = View(this)
+        line.setBackgroundColor(0xFF2C2C31.toInt())
 
         fillGrid()
-        dlg = sheet("", tabRow, catScroll, scroll, sliderBox, showHeader = false, onClose = {
+        dlg = sheet("", tabRow, line, catScroll, searchBox, scroll, showHeader = false, heightPx = panelH, onClose = {
             if (c.paramSig() == before) project.discardCheckpoint()
             afterEdit()
         })
     }
+
+    private fun controlsRow(): View = findViewById(R.id.controls)
 
     private var refreshGridHolder: (() -> Unit)? = null
 
