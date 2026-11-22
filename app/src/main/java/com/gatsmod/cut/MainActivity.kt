@@ -121,6 +121,8 @@ class MainActivity : AppCompatActivity() {
             syncUi()
         }
         timeline.onEdited = { afterEdit() }
+        timeline.onAdd = { k -> if (k == LaneKind.AUDIO) audioPicker.launch(arrayOf("audio/*")) else textDialog() }
+        timeline.onSpecial = { name -> soon(name) }
 
         findViewById<View>(R.id.emptyPreview).setOnClickListener { pickVideo() }
         findViewById<View>(R.id.addClipButton).setOnClickListener { pickVideo() }
@@ -135,7 +137,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.menuButton).setOnClickListener {
             finish()
         }
-        findViewById<View>(R.id.settingsButton).setOnClickListener { aboutDialog() }
+        findViewById<View>(R.id.settingsButton).setOnClickListener { searchDialog() }
         findViewById<View>(R.id.exportButton).setOnClickListener { startExport() }
         findViewById<View>(R.id.resChip).setOnClickListener { exportSettingsDialog() }
         findViewById<View>(R.id.keyframeButton).setOnClickListener { keyframeDialog() }
@@ -540,13 +542,13 @@ class MainActivity : AppCompatActivity() {
         T(R.drawable.ic_cut, "Edit") { val c = need(); if (c != null) syncUi() },
         T(R.drawable.ic_audio, "Audio") { audioPicker.launch(arrayOf("audio/*")) },
         T(R.drawable.ic_text, "Text") { textDialog() },
+        T(R.drawable.ic_effects, "Effects") { effectsDialog() },
         T(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
         T(R.drawable.ic_captions, "Captions") { srtPicker.launch(arrayOf("*/*")) },
-        T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
-        T(R.drawable.ic_effects, "Effects") { effectsDialog() },
         T(R.drawable.ic_filters, "Filters") { filtersDialog() },
-        T(R.drawable.ic_canvas, "Canvas") { canvasDialog() },
         T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
+        T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
+        T(R.drawable.ic_canvas, "Canvas") { canvasDialog() },
         T(R.drawable.ic_autocap, "Auto captions") { soon("Auto captions") },
         T(R.drawable.ic_star, "Templates") { soon("Templates") }
     )
@@ -733,18 +735,358 @@ class MainActivity : AppCompatActivity() {
 
     // ============================================================ look tools
 
-    private fun filtersDialog() {
-        val c = need(true) ?: return
-        lookSheet("Filters", c, chips(Fx.FILTER_NAMES, c.filter) { c.filter = it; live() })
+    private fun filtersDialog() = colorPanel(0)
+
+    private fun adjustDialog() = colorPanel(1)
+
+    private class Param(val name: String, val icon: Int, val min: Int, val max: Int, val get: () -> Float, val set: (Float) -> Unit)
+
+    private fun filterMatrix(i: Int): android.graphics.ColorFilter? {
+        val cm = android.graphics.ColorMatrix()
+        when (i) {
+            1 -> cm.setSaturation(1.5f)
+            2 -> cm.setScale(1.12f, 1f, 0.85f, 1f)
+            3 -> cm.setScale(0.88f, 1f, 1.15f, 1f)
+            4 -> cm.setSaturation(0f)
+            5 -> cm.set(floatArrayOf(.393f, .769f, .189f, 0f, 0f, .349f, .686f, .168f, 0f, 0f, .272f, .534f, .131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+            6 -> cm.set(floatArrayOf(.8f, 0f, 0f, 0f, 34f, 0f, .8f, 0f, 0f, 34f, 0f, 0f, .8f, 0f, 34f, 0f, 0f, 0f, 1f, 0f))
+            7 -> cm.set(floatArrayOf(-1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))
+            else -> return null
+        }
+        return android.graphics.ColorMatrixColorFilter(cm)
     }
 
-    private fun adjustDialog() {
+    private val CYAN = 0xFF25F4EE.toInt()
+
+    /** CapCut-style bottom panel with "Filters" and "Adjust" tabs. */
+    private fun colorPanel(startTab: Int) {
         val c = need(true) ?: return
-        lookSheet("Adjust", c,
-            slider("Brightness", -0.5f, 0.5f, c.brightness, { "%+d".format((it * 100).toInt()) }) { c.brightness = it; live() },
-            slider("Contrast", 0.5f, 1.5f, c.contrast, { "%d%%".format((it * 100).toInt()) }) { c.contrast = it; live() },
-            slider("Saturation", 0f, 2f, c.saturation, { "%d%%".format((it * 100).toInt()) }) { c.saturation = it; live() },
-            slider("Temperature", -1f, 1f, c.temp, { "%+d".format((it * 100).toInt()) }) { c.temp = it; live() })
+        project.checkpoint()
+        val before = c.paramSig()
+        val d = Dialog(this)
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        val rbg = GradientDrawable()
+        rbg.setColor(0xFF1E1E21.toInt())
+        rbg.cornerRadii = floatArrayOf(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), 0f, 0f, 0f, 0f)
+        root.background = rbg
+
+        val head = LinearLayout(this)
+        head.gravity = Gravity.CENTER_VERTICAL
+        head.setPadding(dp(14), 0, dp(10), 0)
+        val content = FrameLayout(this)
+        val tabViews = ArrayList<Pair<TextView, View>>()
+        fun show(tab: Int) {
+            tabViews.forEachIndexed { i, (t, u) ->
+                t.setTextColor(if (i == tab) Color.WHITE else 0xFF8E8E96.toInt())
+                u.visibility = if (i == tab) View.VISIBLE else View.INVISIBLE
+            }
+            content.removeAllViews()
+            content.addView(if (tab == 0) filtersContent(c) else adjustContent(c))
+        }
+        listOf("Filters", "Adjust").forEachIndexed { i, name ->
+            val col = LinearLayout(this)
+            col.orientation = LinearLayout.VERTICAL
+            col.gravity = Gravity.CENTER_HORIZONTAL
+            col.setPadding(0, 0, dp(26), 0)
+            val t = TextView(this)
+            t.text = name
+            t.textSize = 17f
+            t.setTypeface(null, Typeface.BOLD)
+            t.setPadding(0, dp(14), 0, dp(8))
+            val u = View(this)
+            u.setBackgroundColor(CYAN)
+            col.addView(t)
+            col.addView(u, LinearLayout.LayoutParams(dp(30), dp(2)))
+            col.setOnClickListener { show(i) }
+            tabViews.add(t to u)
+            head.addView(col)
+        }
+        head.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        val ok = ImageView(this)
+        ok.setImageResource(R.drawable.ic_check)
+        ok.scaleType = ImageView.ScaleType.CENTER
+        ok.setOnClickListener { d.dismiss() }
+        head.addView(ok, LinearLayout.LayoutParams(dp(44), dp(44)))
+        root.addView(head)
+        val line = View(this)
+        line.setBackgroundColor(0xFF343438.toInt())
+        root.addView(line, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(236)))
+        d.setContentView(root)
+        d.setOnDismissListener {
+            if (c.paramSig() == before) project.discardCheckpoint()
+            afterEdit()
+        }
+        d.window?.let { w ->
+            w.setBackgroundDrawableResource(android.R.color.transparent)
+            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
+            w.setGravity(Gravity.BOTTOM)
+            w.setDimAmount(0f)
+        }
+        show(startTab)
+        d.show()
+    }
+
+    private fun filtersContent(c: Clip): View {
+        val scroll = android.widget.ScrollView(this)
+        scroll.isVerticalScrollBarEnabled = false
+        val grid = LinearLayout(this)
+        grid.orientation = LinearLayout.VERTICAL
+        grid.setPadding(dp(10), dp(10), dp(10), dp(10))
+        val tiles = ArrayList<FrameLayout>()
+        val thumbs = ArrayList<ImageView>()
+        fun mark() {
+            tiles.forEachIndexed { i, f ->
+                val g = GradientDrawable()
+                g.cornerRadius = dp(8).toFloat()
+                g.setColor(Color.TRANSPARENT)
+                if (i == c.filter) g.setStroke(dp(2), Color.WHITE)
+                f.foreground = g
+            }
+        }
+        var row: LinearLayout? = null
+        Fx.FILTER_NAMES.forEachIndexed { i, name ->
+            if (i % 4 == 0) {
+                row = LinearLayout(this)
+                grid.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(92)))
+            }
+            val f = FrameLayout(this)
+            val bg = GradientDrawable()
+            bg.cornerRadius = dp(8).toFloat()
+            bg.setColor(0xFF3A3A3F.toInt())
+            f.background = bg
+            f.clipToOutline = true
+            val iv = ImageView(this)
+            iv.scaleType = ImageView.ScaleType.CENTER_CROP
+            iv.colorFilter = filterMatrix(i)
+            f.addView(iv, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            thumbs.add(iv)
+            if (i == 0) {
+                val none = TextView(this)
+                none.text = "⊘"
+                none.textSize = 30f
+                none.gravity = Gravity.CENTER
+                none.setTextColor(0xFFCCCCD2.toInt())
+                f.addView(none, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            }
+            val lab = TextView(this)
+            lab.text = if (i == 0) "None" else name
+            lab.textSize = 11f
+            lab.gravity = Gravity.CENTER
+            lab.setTextColor(0xFFF2F2F5.toInt())
+            lab.setBackgroundColor(0x99000000.toInt())
+            lab.setPadding(0, dp(3), 0, dp(3))
+            f.addView(lab, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+            f.setOnClickListener { c.filter = i; mark(); live() }
+            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4))
+            row!!.addView(f, lp)
+            tiles.add(f)
+        }
+        // pad the last row so tiles keep their width
+        val r = row
+        if (r != null) while (r.childCount < 4) r.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        mark()
+        // preview picture of the clip, coloured by each filter
+        val bmp = Thumbs.get(this, c.uri, c.srcInMs + max(0L, engine.playheadMs - c.startMs)) {
+            val b2 = Thumbs.get(this, c.uri, c.srcInMs + max(0L, engine.playheadMs - c.startMs)) {}
+            if (b2 != null) thumbs.forEachIndexed { i, v -> if (i > 0) v.setImageBitmap(b2) else v.setImageBitmap(b2) }
+        }
+        if (bmp != null) thumbs.forEach { it.setImageBitmap(bmp) }
+        scroll.addView(grid)
+        return scroll
+    }
+
+    private fun adjustContent(c: Clip): View {
+        val params = listOf(
+            Param("Brightness", R.drawable.ic_hdr, -100, 100, { c.brightness * 200f }, { c.brightness = it / 200f }),
+            Param("Contrast", R.drawable.ic_adjust, -100, 100, { (c.contrast - 1f) * 200f }, { c.contrast = 1f + it / 200f }),
+            Param("Saturation", R.drawable.ic_color, -100, 100, { (c.saturation - 1f) * 100f }, { c.saturation = 1f + it / 100f }),
+            Param("Temperature", R.drawable.ic_effects, -100, 100, { c.temp * 100f }, { c.temp = it / 100f }),
+            Param("Hue", R.drawable.ic_hsl, -100, 100, { (if (c.hue > 180f) c.hue - 360f else c.hue) / 1.8f }, { val h = it * 1.8f; c.hue = if (h < 0f) h + 360f else h }),
+            Param("Lightness", R.drawable.ic_lut, -100, 100, { c.lum }, { c.lum = it }),
+            Param("Blur", R.drawable.ic_blur, 0, 100, { c.blur * 4f }, { c.blur = it / 4f })
+        )
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        var sel = 0
+        // Smart / Customize switch
+        val sw = LinearLayout(this)
+        sw.setPadding(dp(18), dp(12), dp(18), dp(4))
+        val body = FrameLayout(this)
+        val swViews = ArrayList<TextView>()
+        val valueText = TextView(this)
+        val seek = SeekBar(this)
+        val circleViews = ArrayList<Pair<LinearLayout, TextView>>()
+        var seekBusy = false
+        fun loadSeek() {
+            val p = params[sel]
+            seekBusy = true
+            seek.max = p.max - p.min
+            seek.progress = (p.get().toInt() - p.min).coerceIn(0, p.max - p.min)
+            valueText.text = p.get().toInt().toString()
+            seekBusy = false
+            circleViews.forEachIndexed { i, (circ, lab) ->
+                val g = GradientDrawable()
+                g.shape = GradientDrawable.OVAL
+                g.setColor(0xFF2B2B2F.toInt())
+                g.setStroke(dp(1), if (i == sel) CYAN else 0xFF55555B.toInt())
+                circ.background = g
+                lab.setTextColor(if (i == sel) CYAN else 0xFFE6E6EA.toInt())
+            }
+        }
+        fun customize(): View {
+            val v = LinearLayout(this)
+            v.orientation = LinearLayout.VERTICAL
+            val hs = HorizontalScrollView(this)
+            hs.isHorizontalScrollBarEnabled = false
+            val row = LinearLayout(this)
+            row.setPadding(dp(10), dp(6), dp(10), 0)
+            circleViews.clear()
+            params.forEachIndexed { i, p ->
+                val col = LinearLayout(this)
+                col.orientation = LinearLayout.VERTICAL
+                col.gravity = Gravity.CENTER_HORIZONTAL
+                col.setPadding(dp(7), 0, dp(7), 0)
+                val circ = LinearLayout(this)
+                circ.gravity = Gravity.CENTER
+                val iv = ImageView(this)
+                iv.setImageResource(p.icon)
+                circ.addView(iv, LinearLayout.LayoutParams(dp(24), dp(24)))
+                col.addView(circ, LinearLayout.LayoutParams(dp(48), dp(48)))
+                val lab = TextView(this)
+                lab.text = p.name
+                lab.textSize = 11f
+                lab.setPadding(0, dp(5), 0, 0)
+                col.addView(lab)
+                col.setOnClickListener { sel = i; loadSeek() }
+                circleViews.add(circ to lab)
+                row.addView(col)
+            }
+            hs.addView(row)
+            v.addView(hs)
+            valueText.setTextColor(Color.WHITE)
+            valueText.textSize = 12f
+            valueText.gravity = Gravity.CENTER
+            (valueText.parent as? ViewGroup)?.removeView(valueText)
+            v.addView(valueText, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) })
+            (seek.parent as? ViewGroup)?.removeView(seek)
+            seek.progressTintList = android.content.res.ColorStateList.valueOf(CYAN)
+            seek.thumbTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+            seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, pr: Int, fromUser: Boolean) {
+                    if (seekBusy || !fromUser) return
+                    val p = params[sel]
+                    val value = (pr + p.min).toFloat()
+                    p.set(value)
+                    valueText.text = value.toInt().toString()
+                    live()
+                }
+                override fun onStartTrackingTouch(s: SeekBar?) {}
+                override fun onStopTrackingTouch(s: SeekBar?) {}
+            })
+            v.addView(seek, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(dp(24), 0, dp(24), 0) })
+            val reset = TextView(this)
+            reset.text = "↺  Reset"
+            reset.textSize = 14f
+            reset.setTextColor(0xFFE6E6EA.toInt())
+            reset.setPadding(dp(18), dp(14), dp(18), dp(6))
+            reset.setOnClickListener {
+                val p = params[sel]
+                p.set(if (p.min == 0) 0f else 0f)
+                loadSeek(); live()
+            }
+            v.addView(reset)
+            loadSeek()
+            return v
+        }
+        fun smart(): View {
+            val row = LinearLayout(this)
+            row.setPadding(dp(14), dp(10), dp(14), 0)
+            fun item(icon: Int, name: String, act: () -> Unit) {
+                val col = LinearLayout(this)
+                col.orientation = LinearLayout.VERTICAL
+                col.gravity = Gravity.CENTER_HORIZONTAL
+                col.setPadding(dp(8), 0, dp(8), 0)
+                val circ = LinearLayout(this)
+                circ.gravity = Gravity.CENTER
+                val g = GradientDrawable()
+                g.shape = GradientDrawable.OVAL
+                g.setColor(0xFF2B2B2F.toInt())
+                g.setStroke(dp(1), 0xFF55555B.toInt())
+                circ.background = g
+                val iv = ImageView(this)
+                iv.setImageResource(icon)
+                circ.addView(iv, LinearLayout.LayoutParams(dp(24), dp(24)))
+                col.addView(circ, LinearLayout.LayoutParams(dp(48), dp(48)))
+                val lab = TextView(this)
+                lab.text = name
+                lab.textSize = 11f
+                lab.setTextColor(0xFFE6E6EA.toInt())
+                lab.setPadding(0, dp(5), 0, 0)
+                col.addView(lab)
+                col.setOnClickListener { act() }
+                row.addView(col)
+            }
+            item(R.drawable.ic_ai, "Auto adjust") {
+                c.brightness = 0.03f; c.contrast = 1.1f; c.saturation = 1.15f
+                live(); toast("Auto adjust applied — fine-tune it in Customize")
+            }
+            item(R.drawable.ic_lut, "Color match") { soon("Color match") }
+            item(R.drawable.ic_color, "Color correction") { soon("Color correction") }
+            return row
+        }
+        listOf("Smart", "Customize").forEachIndexed { i, name ->
+            val t = TextView(this)
+            t.text = name
+            t.textSize = 16f
+            t.setTypeface(null, Typeface.BOLD)
+            t.setPadding(0, 0, dp(26), 0)
+            t.setOnClickListener {
+                swViews.forEachIndexed { j, v -> v.setTextColor(if (j == i) Color.WHITE else 0xFF8E8E96.toInt()) }
+                body.removeAllViews()
+                body.addView(if (i == 0) smart() else customize())
+            }
+            swViews.add(t)
+            sw.addView(t)
+        }
+        box.addView(sw)
+        box.addView(body)
+        swViews[1].performClick()
+        return box
+    }
+
+    private fun searchDialog() {
+        val all = (mainTools() + clipTools(Clip(id = -1, kind = LaneKind.VIDEO))).distinctBy { it.name }
+        val e = EditText(this)
+        e.hint = "Search for features and assets here"
+        e.setTextColor(Color.WHITE)
+        e.setHintTextColor(0xFF8E8E96.toInt())
+        e.setSingleLine()
+        val results = LinearLayout(this)
+        results.orientation = LinearLayout.VERTICAL
+        var dlg: Dialog? = null
+        fun fill(q: String) {
+            results.removeAllViews()
+            all.filter { q.isBlank() || it.name.contains(q, true) }.take(8).forEach { t ->
+                val r = TextView(this)
+                r.text = t.name
+                r.textSize = 15f
+                r.setTextColor(Color.WHITE)
+                r.setPadding(dp(4), dp(11), 0, dp(11))
+                r.setOnClickListener { dlg?.dismiss(); t.act() }
+                results.addView(r)
+            }
+        }
+        e.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { fill(s?.toString() ?: "") }
+            override fun beforeTextChanged(s: CharSequence?, st: Int, c1: Int, a: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c1: Int) {}
+        })
+        fill("")
+        dlg = sheet("Search", e, results)
     }
 
     private fun hslDialog() {

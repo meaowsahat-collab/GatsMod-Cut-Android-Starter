@@ -34,6 +34,12 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
     /** A drag (trim / move) finished and changed the project. */
     var onEdited: (() -> Unit)? = null
 
+    /** Tap on an empty "Add audio" / "Add text" row. */
+    var onAdd: ((LaneKind) -> Unit)? = null
+
+    /** Tap on the Cover / AI clipper boxes left of the first clip. */
+    var onSpecial: ((String) -> Unit)? = null
+
     private val density = resources.displayMetrics.density
     private fun dp(v: Float) = v * density
 
@@ -114,10 +120,11 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
         fun add(k: LaneKind, h: Float, always: Boolean) {
             if (always || (p != null && p.lane(k).isNotEmpty())) { out.add(Row(k, y, h)); y += h + gap }
         }
-        add(LaneKind.OVERLAY, smallH, false)
-        add(LaneKind.TEXT, smallH, false)
+        val hasMain = p != null && p.main.isNotEmpty()
         add(LaneKind.VIDEO, mainH, true)
-        add(LaneKind.AUDIO, smallH, false)
+        add(LaneKind.AUDIO, smallH, hasMain)
+        add(LaneKind.TEXT, smallH, hasMain)
+        add(LaneKind.OVERLAY, smallH, false)
         return out
     }
 
@@ -146,14 +153,77 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
                 canvas.drawRoundRect(r, dp(8f), dp(8f), dashed)
                 canvas.drawText("Tap + to add a video", width / 2f, row.top + row.h / 2f + dp(4f), hint)
             }
+            if (clips.isEmpty() && (row.kind == LaneKind.AUDIO || row.kind == LaneKind.TEXT)) drawPlaceholder(canvas, row)
             for (c in clips) drawClip(canvas, c, row, c.id == p?.selectedId)
         }
+        drawSideBoxes(canvas, rows)
         // dim everything after the end of the main track
         val endX = xOf(total())
         if (endX < width) canvas.drawRect(max(0f, endX), rulerH, width.toFloat(), height.toFloat(), dim)
         val cx = width / 2f
         canvas.drawLine(cx, 0f, cx, height.toFloat(), playLine)
         canvas.drawCircle(cx, rulerH - dp(2f), dp(4f), white)
+    }
+
+    private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2A2A2E.toInt() }
+    private val boxText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE6E6EA.toInt(); textSize = dp(11f); textAlign = Paint.Align.CENTER }
+    private val addText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9A9AA2.toInt(); textSize = dp(13f) }
+    private val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF7A1A.toInt() }
+
+    private fun barRect(row: Row) = RectF(xOf(0), row.top, max(xOf(total()), xOf(0) + dp(190f)), row.top + row.h)
+    private fun iconBox(row: Row) = RectF(xOf(0) - dp(46f), row.top, xOf(0) - dp(10f), row.top + row.h)
+    private fun coverBox(row: Row) = RectF(xOf(0) - dp(66f), row.top, xOf(0) - dp(8f), row.top + row.h)
+    private fun aiBox(row: Row) = RectF(xOf(0) - dp(130f), row.top, xOf(0) - dp(72f), row.top + row.h)
+
+    private fun drawPlaceholder(canvas: Canvas, row: Row) {
+        val r = barRect(row)
+        fill.color = 0xFF1B1B1F.toInt()
+        canvas.drawRoundRect(r, dp(7f), dp(7f), fill)
+        val s = if (row.kind == LaneKind.AUDIO) "+  Add audio" else "+  Add text"
+        canvas.drawText(s, r.left + dp(12f), r.centerY() + dp(4.5f), addText)
+    }
+
+    private fun drawSideBoxes(canvas: Canvas, rows: List<Row>) {
+        val p = project ?: return
+        val first = p.main.firstOrNull() ?: return
+        for (row in rows) {
+            when (row.kind) {
+                LaneKind.VIDEO -> {
+                    val cb = coverBox(row)
+                    if (cb.right > -dp(10f)) {
+                        canvas.drawRoundRect(cb, dp(7f), dp(7f), boxPaint)
+                        val bmp = Thumbs.get(context, first.uri, first.srcInMs) { invalidate() }
+                        if (bmp != null) {
+                            canvas.save()
+                            canvas.clipPath(Path().apply { addRoundRect(cb, dp(7f), dp(7f), Path.Direction.CW) })
+                            val ta = cb.width() / cb.height()
+                            val ba = bmp.width.toFloat() / bmp.height
+                            val src = if (ba > ta) { val w = (bmp.height * ta).toInt(); android.graphics.Rect((bmp.width - w) / 2, 0, (bmp.width + w) / 2, bmp.height) }
+                            else { val h = (bmp.width / ta).toInt(); android.graphics.Rect(0, (bmp.height - h) / 2, bmp.width, (bmp.height + h) / 2) }
+                            canvas.drawBitmap(bmp, src, cb, thumbPaint)
+                            canvas.drawRect(cb, dim)
+                            canvas.restore()
+                        }
+                        canvas.drawText("Cover", cb.centerX(), cb.centerY() + dp(4f), boxText)
+                    }
+                    val ab = aiBox(row)
+                    if (ab.right > -dp(10f)) {
+                        canvas.drawRoundRect(ab, dp(7f), dp(7f), boxPaint)
+                        canvas.drawText("AI", ab.centerX(), ab.centerY() - dp(1f), boxText)
+                        canvas.drawText("clipper", ab.centerX(), ab.centerY() + dp(12f), boxText)
+                        canvas.drawRoundRect(RectF(ab.centerX() - dp(14f), ab.top - dp(6f), ab.centerX() + dp(14f), ab.top + dp(6f)), dp(5f), dp(5f), badge)
+                    }
+                }
+                LaneKind.AUDIO, LaneKind.TEXT -> {
+                    val ib = iconBox(row)
+                    if (ib.right > -dp(10f)) {
+                        canvas.drawRoundRect(ib, dp(7f), dp(7f), boxPaint)
+                        canvas.drawText(if (row.kind == LaneKind.AUDIO) "♪" else "T", ib.centerX(), ib.centerY() + dp(5f), boxText)
+                    }
+                }
+                else -> {}
+            }
+        }
     }
 
     private fun drawRuler(canvas: Canvas) {
@@ -329,6 +399,21 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
 
     private fun tap(p: Project, x: Float, y: Float) {
         val hit = clipAt(x, y)
+        if (hit == null && p.main.isNotEmpty()) {
+            for (row in rows()) {
+                if (y < row.top || y > row.top + row.h) continue
+                when (row.kind) {
+                    LaneKind.VIDEO -> {
+                        if (coverBox(row).contains(x, y)) { onSpecial?.invoke("Cover"); return }
+                        if (aiBox(row).contains(x, y)) { onSpecial?.invoke("AI clipper"); return }
+                    }
+                    LaneKind.AUDIO, LaneKind.TEXT -> if (p.lane(row.kind).isEmpty() && (iconBox(row).contains(x, y) || barRect(row).contains(x, y))) {
+                        onAdd?.invoke(row.kind); return
+                    }
+                    else -> {}
+                }
+            }
+        }
         if (hit != null) {
             p.selectedId = hit.id
             onSelect?.invoke(hit)

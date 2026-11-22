@@ -66,8 +66,8 @@ class HomeActivity : AppCompatActivity() {
         // big cards
         val cards = LinearLayout(this)
         cards.addView(bigCard(R.drawable.ic_add, "New video", 1.5f) { openEditor(null, true) })
-        cards.addView(bigCard(R.drawable.ic_media, "Edit photo", 1f) { toast("Photo editing is coming soon") })
-        body.addView(cards, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150)))
+        cards.addView(bigCard(R.drawable.ic_photo, "Edit photo", 1f) { toast("Photo editing is coming soon") })
+        body.addView(cards, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116)))
 
         // tools grid
         val tools = listOf(
@@ -76,7 +76,7 @@ class HomeActivity : AppCompatActivity() {
             Triple(R.drawable.ic_resize, "Desktop editor", "Desktop editor"),
             Triple(R.drawable.ic_autocap, "Auto captions", "Auto captions"),
             Triple(R.drawable.ic_removebg, "Remove background", "Remove background"),
-            Triple(R.drawable.ic_media, "Camera", "Camera"),
+            Triple(R.drawable.ic_camera, "Camera", "Camera"),
             Triple(R.drawable.ic_captions, "Teleprompter", "Teleprompter"),
             Triple(R.drawable.ic_collage, "All tools", "")
         )
@@ -151,15 +151,16 @@ class HomeActivity : AppCompatActivity() {
         box.background = bg
         val iv = ImageView(this)
         iv.setImageResource(icon)
-        box.addView(iv, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER))
-        l.addView(box, LinearLayout.LayoutParams(dp(54), dp(54)))
+        box.addView(iv, FrameLayout.LayoutParams(dp(26), dp(26), Gravity.CENTER))
+        l.addView(box, LinearLayout.LayoutParams(dp(44), dp(44)))
         val t = TextView(this)
         t.text = label
-        t.textSize = 20f
+        t.gravity = Gravity.CENTER
+        t.textSize = 17f
         t.setTypeface(null, Typeface.BOLD)
         t.setTextColor(0xFF111111.toInt())
-        t.setPadding(0, dp(10), 0, 0)
-        l.addView(t)
+        t.setPadding(0, dp(8), 0, 0)
+        l.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
         lp.setMargins(if (weight > 1f) 0 else dp(10), 0, 0, 0)
         l.layoutParams = lp
@@ -180,10 +181,10 @@ class HomeActivity : AppCompatActivity() {
         iv.setImageResource(icon)
         iv.setColorFilter(0xFF222222.toInt())
         box.addView(iv, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER))
-        l.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(66)))
+        l.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(62)))
         val t = TextView(this)
         t.text = label
-        t.textSize = 13f
+        t.textSize = 11f
         t.gravity = Gravity.CENTER
         t.setTypeface(null, Typeface.BOLD)
         t.setTextColor(0xFF111111.toInt())
