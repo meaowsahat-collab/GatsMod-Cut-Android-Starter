@@ -175,6 +175,7 @@ class MainActivity : AppCompatActivity() {
             val n = ProjectStore.load(this, projectId, project)
             if (n == null) toast("Could not open this project") else {
                 projectName = n
+                dropMissingMedia()
                 engine.refresh()
                 if (!project.isEmpty()) engine.seekTo(0)
             }
@@ -183,6 +184,23 @@ class MainActivity : AppCompatActivity() {
         }
         syncUi()
         tickLoop()
+    }
+
+    /** Removes clips whose source file can no longer be opened (e.g. access to a picked video was lost). */
+    private fun dropMissingMedia() {
+        fun ok(c: Clip): Boolean {
+            if (!c.isMedia || c.uri.isEmpty()) return true
+            val u = Uri.parse(c.uri)
+            return try {
+                if (u.scheme == "file") File(u.path ?: "").exists()
+                else contentResolver.openFileDescriptor(u, "r")?.use { true } ?: false
+            } catch (e: Exception) { false }
+        }
+        val bad = (project.main + project.audio).filter { !ok(it) }
+        if (bad.isEmpty()) return
+        project.main.removeAll(bad.toSet()); project.audio.removeAll(bad.toSet())
+        project.relayout()
+        Toast.makeText(this, "${bad.size} clip(s) were removed because their original video can no longer be opened. Import the video again.", Toast.LENGTH_LONG).show()
     }
 
     private val tick = object : Runnable {
@@ -299,10 +317,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun pickVideo() = videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
 
-    private fun loadVideo(u: Uri) {
+    /** Photo-picker links stop working after the app is closed, so a video whose access cannot be kept is copied into the app. */
+    private fun keepAccess(u: Uri, name: String): Uri {
+        persist(u)
+        if (contentResolver.persistedUriPermissions.any { it.uri == u }) return u
+        return try {
+            val dir = File(filesDir, "media"); dir.mkdirs()
+            val ext = name.substringAfterLast('.', "mp4").take(5).filter { it.isLetterOrDigit() }.ifEmpty { "mp4" }
+            val f = File(dir, "V_" + System.currentTimeMillis() + "." + ext)
+            contentResolver.openInputStream(u)?.use { i -> f.outputStream().use { o -> i.copyTo(o, 256 * 1024) } } ?: return u
+            Uri.fromFile(f)
+        } catch (e: Exception) { u }
+    }
+
+    private fun loadVideo(src: Uri) {
+        toast("Importing video…")
         Thread {
+            val name0 = MediaProbe.displayName(this, src)
+            val u = keepAccess(src, name0)
             val info = MediaProbe.probe(this, u)
-            val name = MediaProbe.displayName(this, u)
+            val name = name0
             runOnUiThread {
                 if (info == null || !info.hasVideo || info.durationMs <= 0) { toast("Could not read this video"); return@runOnUiThread }
                 engine.pause()
