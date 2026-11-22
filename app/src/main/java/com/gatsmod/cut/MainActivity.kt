@@ -572,6 +572,7 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_animation, "Animations") { animationDialog() },
                 del,
                 T(R.drawable.ic_volume, "Volume") { volumeDialog() },
+                T(R.drawable.ic_noise, "Denoise") { denoiseDialog() },
                 T(R.drawable.ic_fade, "Fade") { fadeDialog() },
                 T(R.drawable.ic_transitions, "Transition") { transitionDialog() },
                 T(R.drawable.ic_effects, "Effects") { effectsDialog() },
@@ -602,6 +603,7 @@ class MainActivity : AppCompatActivity() {
             LaneKind.AUDIO -> listOf(
                 split,
                 T(R.drawable.ic_volume, "Volume") { volumeDialog() },
+                T(R.drawable.ic_noise, "Denoise") { denoiseDialog() },
                 T(R.drawable.ic_fade, "Fade") { fadeDialog() },
                 T(R.drawable.ic_speed, "Speed") { speedDialog() },
                 trimS, trimE, dup, del
@@ -615,6 +617,14 @@ class MainActivity : AppCompatActivity() {
                 split, dup, del
             )
         }
+    }
+
+    private fun denoiseDialog() {
+        val c = need() ?: return
+        if (!c.isMedia) { toast("Noise reduction works on video and audio clips"); return }
+        lookSheet("Noise reduction", c,
+            slider("Strength", 0f, 1f, c.denoise, { "%d%%".format((it * 100).toInt()) }) { c.denoise = it; live() },
+            label("Quiets steady background hiss and hum between words and removes low rumble. It is a simple filter, not AI, so very high strength can make speech sound slightly choppy."))
     }
 
     private fun fadeDialog() {

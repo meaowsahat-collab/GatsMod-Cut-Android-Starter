@@ -255,3 +255,34 @@ class FadeProcessor(private val volume: Float, private val inMs: Long, private v
         out.flip()
     }
 }
+
+/** Noise reduction for 16-bit PCM audio (see [DenoiseCore]). */
+class DenoiseProcessor(private val level: Float) : BaseAudioProcessor() {
+    private var core: DenoiseCore? = null
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+        return inputAudioFormat
+    }
+
+    override fun onFlush() {
+        core = DenoiseCore(max(1, inputAudioFormat.channelCount), max(8000, inputAudioFormat.sampleRate), level)
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val size = inputBuffer.remaining()
+        if (size == 0) return
+        val ch = max(1, inputAudioFormat.channelCount)
+        val cr = core ?: DenoiseCore(ch, max(8000, inputAudioFormat.sampleRate), level).also { core = it }
+        val inp = inputBuffer.order(ByteOrder.nativeOrder())
+        val frames = size / (2 * ch)
+        val data = FloatArray(frames * ch)
+        for (i in data.indices) data[i] = inp.getShort() / 32768f
+        cr.process(data, frames)
+        val out = replaceOutputBuffer(frames * ch * 2).order(ByteOrder.nativeOrder())
+        for (v in data) out.putShort((v * 32768f).toInt().coerceIn(-32768, 32767).toShort())
+        out.flip()
+        // any odd trailing bytes are dropped
+        while (inp.hasRemaining()) inp.get()
+    }
+}

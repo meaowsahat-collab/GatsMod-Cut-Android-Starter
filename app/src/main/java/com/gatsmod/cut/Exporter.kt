@@ -122,6 +122,7 @@ class Exporter(private val ctx: Context) {
             val audioProcs = mutableListOf<AudioProcessor>()
             val fx = mutableListOf<Effect>()
             fx.addAll(Fx.lookEffects(c))
+            if (c.hasAudio && c.denoise > 0f) audioProcs.add(DenoiseProcessor(c.denoise))
             if (c.speed != 1f) {
                 if (c.hasAudio) {
                     val pair = Effects.createExperimentalSpeedChangingEffect(ConstantSpeed(c.speed))
@@ -170,6 +171,7 @@ class Exporter(private val ctx: Context) {
                 val lenMs = min(a.lengthMs, totalMs - a.startMs)
                 val srcOut = a.srcInMs + (lenMs * a.speed).toLong()
                 val procs = mutableListOf<AudioProcessor>()
+                if (a.denoise > 0f) procs.add(DenoiseProcessor(a.denoise))
                 if (a.speed != 1f) procs.add(Effects.createExperimentalSpeedChangingEffect(ConstantSpeed(a.speed)).first)
                 if (a.fadeInMs > 0 || a.fadeOutMs > 0) procs.add(FadeProcessor(a.volume, a.fadeInMs, a.fadeOutMs, lenMs))
                 else if (a.volume != 1f) procs.add(VolumeProcessor(a.volume))

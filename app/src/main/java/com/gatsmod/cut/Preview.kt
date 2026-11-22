@@ -42,6 +42,20 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     private var appliedKey = ""
     private var audioClipId = -1L
 
+    /** ExoPlayer whose audio output runs through the noise reducer when [denoise] > 0. */
+    private fun buildPlayer(denoise: Float): ExoPlayer {
+        if (denoise <= 0f) return ExoPlayer.Builder(ctx).build()
+        val factory = object : androidx.media3.exoplayer.DefaultRenderersFactory(ctx) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink? =
+                androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(false)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf<androidx.media3.common.audio.AudioProcessor>(DenoiseProcessor(denoise)))
+                    .build()
+        }
+        return ExoPlayer.Builder(ctx, factory).build()
+    }
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (!isPlaying) audioPlayer.pause()
@@ -172,7 +186,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val pos = ((playheadMs - c.startMs).coerceAtLeast(0L) * c.speed).toLong()
         val play = player.playWhenReady
         val old = player
-        val fresh = ExoPlayer.Builder(ctx).build()
+        val fresh = buildPlayer(c.denoise)
         try {
             fresh.setVideoEffects(effects)
         } catch (e: Exception) {
@@ -199,7 +213,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val key = "${c.id}|${c.paramSig()}"
         if (!force && key == appliedKey) return
         appliedKey = key
-        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
+        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.denoise}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
             "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
             c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" } else "off"
         if (fxKey != appliedFx) {
@@ -209,7 +223,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
                 try { Fx.previewEffects(c) { playheadMs - c.startMs } } catch (e: Exception) { effectsOk = false; emptyList() }
             } else emptyList()
             // empty -> empty needs no rebuild
-            if (hadAny || fx.isNotEmpty()) rebuild(fx)
+            if (hadAny || fx.isNotEmpty() || c.denoise > 0f) rebuild(fx)
         }
         player.playbackParameters = PlaybackParameters(c.speed)
         player.volume = c.volume
