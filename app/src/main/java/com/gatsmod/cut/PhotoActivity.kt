@@ -48,7 +48,7 @@ class PhotoActivity : AppCompatActivity() {
         root.addView(image,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f))
         categoryRow=LinearLayout(this).apply{gravity=Gravity.CENTER;orientation=LinearLayout.HORIZONTAL}
         val scroller=android.widget.HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false;addView(categoryRow)}
-        listOf("Light","Color","Effects","Detail","Crop","Presets").forEach{ name->categoryRow.addView(text(toolIcon(name)+"\\n"+name,13f).apply{setOnClickListener{category=name;refreshPanel()}})}
+        listOf("Light","Color","Effects","Detail","Crop","Presets").forEach{ name->categoryRow.addView(text(toolIcon(name)+"\n"+name,13f).apply{setOnClickListener{category=name;refreshPanel()}})}
         root.addView(scroller)
         panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(6),dp(8),dp(6))}
         root.addView(android.widget.ScrollView(this).apply{addView(panel)},LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(230)))
