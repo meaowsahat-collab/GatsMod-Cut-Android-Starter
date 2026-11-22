@@ -1310,12 +1310,9 @@ class MainActivity : AppCompatActivity() {
                 col.setOnClickListener { act() }
                 row.addView(col)
             }
-            item(R.drawable.ic_ai, "Auto adjust") {
-                c.brightness = 0.03f; c.contrast = 1.1f; c.saturation = 1.15f
-                live(); toast("Auto adjust applied — fine-tune it in Customize")
-            }
-            item(R.drawable.ic_lut, "Color match") { soon("Color match") }
-            item(R.drawable.ic_color, "Color correction") { soon("Color correction") }
+            item(R.drawable.ic_ai, "Auto adjust") { analyzeColors(c, 0) }
+            item(R.drawable.ic_lut, "Color match") { analyzeColors(c, 2) }
+            item(R.drawable.ic_color, "Color correction") { analyzeColors(c, 1) }
             return row
         }
         listOf("Smart", "Customize").forEachIndexed { i, name ->
@@ -1336,6 +1333,30 @@ class MainActivity : AppCompatActivity() {
         box.addView(body)
         swViews[1].performClick()
         return box
+    }
+
+    /** mode 0 = auto adjust, 1 = color correction, 2 = match the neighbouring clip. */
+    private fun analyzeColors(c: Clip, mode: Int) {
+        val ref = if (mode == 2) project.main.let { l -> val i = l.indexOf(c); l.getOrNull(i - 1) ?: l.getOrNull(i + 1) } else null
+        if (mode == 2 && ref == null) { toast("Add another clip to match colours with"); return }
+        toast("Looking at the picture…")
+        Thread {
+            fun grab(k: Clip): ColorMath.Stats? {
+                val r = FrameVideo.openRetriever(this, k.uri) ?: return null
+                try {
+                    val bmp = FrameVideo.frameAt(r, k.srcInMs + (k.srcOutMs - k.srcInMs) / 2, 320) ?: return null
+                    return ColorMath.stats(bmp)
+                } finally { try { r.release() } catch (_: Exception) {} }
+            }
+            val s = grab(c)
+            val rs = if (ref != null) grab(ref) else null
+            runOnUiThread {
+                if (s == null || (ref != null && rs == null)) { toast("Could not read the picture"); return@runOnUiThread }
+                when (mode) { 0 -> ColorMath.auto(c, s, true); 1 -> ColorMath.auto(c, s, false); else -> ColorMath.match(c, s, rs!!) }
+                live()
+                toast("Applied — fine-tune it in Customize")
+            }
+        }.start()
     }
 
     private fun searchDialog() {
