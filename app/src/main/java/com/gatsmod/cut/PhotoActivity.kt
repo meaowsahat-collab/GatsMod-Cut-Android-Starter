@@ -33,6 +33,7 @@ class PhotoActivity : AppCompatActivity() {
     private val values = linkedMapOf("Exposure" to 0f, "Contrast" to 0f, "Highlights" to 0f, "Shadows" to 0f, "Whites" to 0f, "Blacks" to 0f, "Temperature" to 0f, "Tint" to 0f, "Vibrance" to 0f, "Saturation" to 0f, "Fade" to 0f)
     private val picker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { load(it) } }
     private fun dp(v:Int)= (v*resources.displayMetrics.density).toInt()
+    private fun toolIcon(name:String)=when(name){ "Light"->"☼"; "Color"->"◉"; "Effects"->"✧"; "Detail"->"▦"; "Crop"->"⌗"; "Presets"->"▤"; "Exposure"->"☀"; "Contrast"->"◐"; "Highlights"->"✦"; "Shadows"->"◒"; "Whites"->"□"; "Blacks"->"■"; "Temperature"->"♨"; "Tint"->"✿"; "Vibrance"->"◉"; "Saturation"->"◌"; "Fade"->"▧"; else->"✧" }
     private fun text(s:String,size:Float=14f,color:Int=Color.WHITE):TextView=TextView(this).apply { text=s; textSize=size; setTextColor(color); gravity=Gravity.CENTER; setPadding(dp(8),dp(7),dp(8),dp(7)) }
     override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState)
         window.statusBarColor=Color.BLACK; window.navigationBarColor=Color.BLACK
@@ -47,9 +48,9 @@ class PhotoActivity : AppCompatActivity() {
         root.addView(image,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f))
         categoryRow=LinearLayout(this).apply{gravity=Gravity.CENTER;orientation=LinearLayout.HORIZONTAL}
         val scroller=android.widget.HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false;addView(categoryRow)}
-        listOf("Light","Color","Effects","Detail","Crop","Presets").forEach{ name->categoryRow.addView(text(name,13f).apply{setOnClickListener{category=name;refreshPanel()}})}
+        listOf("Light","Color","Effects","Detail","Crop","Presets").forEach{ name->categoryRow.addView(text(toolIcon(name)+"\\n"+name,13f).apply{setOnClickListener{category=name;refreshPanel()}})}
         root.addView(scroller)
-        panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(6),dp(8),dp(6))}
         root.addView(android.widget.ScrollView(this).apply{addView(panel)},LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(230)))
         root.addView(text("Choose Photo",14f,0xFF80D8F2.toInt()).apply{setOnClickListener{picker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))}},LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(48)))
         setContentView(root);refreshPanel();picker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -75,17 +76,17 @@ class PhotoActivity : AppCompatActivity() {
             row.addView(text("Rotate −90°").apply{setOnClickListener{rotation-=90;updatePreview()}})
             row.addView(text("Rotate +90°").apply{setOnClickListener{rotation+=90;updatePreview()}})
             row.addView(text("Reset").apply{setOnClickListener{rotation=0f;updatePreview()}})
-            panel.addView(row);panel.addView(text("Rotation controls active. Crop ratios are a future stage.",12f,0xFF9CA3AF.toInt()));return
+            panel.addView(row);panel.addView(text("⌗  Crop / Rotate",14f,0xFF9EDFF2.toInt()));panel.addView(text("Crop ratios and straighten controls are planned next.",12f,0xFF9CA3AF.toInt()));return
         }
         if(category=="Presets"){
             val row=LinearLayout(this).apply{gravity=Gravity.CENTER;orientation=LinearLayout.HORIZONTAL}
             listOf("Original","Warm","Cool","Mono","Pop").forEach{p->row.addView(text(p,12f).apply{setOnClickListener{applyPreset(p)}})}
             panel.addView(row);return
         }
-        if(category=="Detail"){panel.addView(text("Sharpening and noise reduction are planned for a later stage.",12f,0xFF9CA3AF.toInt()));return}
+        if(category=="Detail"){panel.addView(text("▦  Detail controls",15f,0xFF9EDFF2.toInt()));panel.addView(text("Sharpening, Radius, Detail, Masking and Noise Reduction will be added with the image-processing engine.",12f,0xFF9CA3AF.toInt()));return}
         keys().forEach{k->
             val line=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL}
-            line.addView(text(k,12f),LinearLayout.LayoutParams(dp(94),dp(44)))
+            line.addView(text(toolIcon(k)+" "+k,12f),LinearLayout.LayoutParams(dp(118),dp(48)))
             line.addView(text(String.format("%.0f",values[k]!!*100),11f,0xFFB0B0B0.toInt()),LinearLayout.LayoutParams(dp(42),dp(44)))
             val seek=SeekBar(this).apply{max=200;progress=(values[k]!!*100+100).toInt().coerceIn(0,200)}
             seek.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
