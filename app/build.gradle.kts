@@ -55,6 +55,8 @@ dependencies {
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
     implementation("androidx.media3:media3-transformer:1.5.1")
+    // on-device person segmentation for Remove BG
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
     // offline speech recognition for Auto captions
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.alphacephei:vosk-android:0.3.47")

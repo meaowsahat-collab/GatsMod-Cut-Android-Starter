@@ -33,6 +33,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import android.graphics.Bitmap
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -598,7 +599,7 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_reverse, "Reverse") { reverseClip() },
                 T(R.drawable.ic_freeze, "Freeze") { freezeFrame() },
                 T(R.drawable.ic_mask, "Mask") { maskDialog() },
-                T(R.drawable.ic_removebg, "Remove BG") { soon("Remove background") },
+                T(R.drawable.ic_removebg, "Remove BG") { removeBgDialog() },
                 T(R.drawable.ic_stabilize, "Stabilize") { stabilizeDialog() }
             )
             LaneKind.AUDIO -> listOf(
@@ -832,6 +833,72 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun removeBgDialog() {
+        val c = need(true) ?: return
+        val srcLen = c.srcOutMs - c.srcInMs
+        val names = listOf("Blur", "Black", "White", "Green", "Blue", "Grey")
+        val cols = intArrayOf(0, 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF00B140.toInt(), 0xFF1E5BFF.toInt(), 0xFF808080.toInt())
+        var pick = 0
+        var dlg: Dialog? = null
+        val chipRow = chips(names, 0) { pick = it }
+        val go = button("Remove background") {
+            if (srcLen > 20000) { toast("Remove BG works on clips up to 20 s — cut the clip shorter first"); return@button }
+            dlg?.dismiss()
+            val id = c.id
+            val uri = c.uri; val inMs = c.srcInMs; val outMs = c.srcOutMs
+            val blur = pick == 0; val color = cols[pick]
+            val oldCopy = c.deepCopy(project.newId())
+            runWork("Removing background") { progress ->
+                val r = FrameVideo.openRetriever(this, uri) ?: return@runWork null
+                val seg = RemoveBg(blur, color)
+                val fps = 30
+                val n = max(1, (srcLen * fps / 1000L).toInt())
+                val out = File(File(filesDir, "reversed"), "B_" + System.currentTimeMillis() + ".mp4")
+                var last: Bitmap? = null
+                val res = FrameVideo.write(out, fps, n, 6_000_000, { i ->
+                    val t = (inMs + (i + 0.5f) * 1000f / fps).toLong().coerceIn(inMs, outMs - 1)
+                    val f = FrameVideo.frameAt(r, t, 960) ?: return@write last
+                    val o = seg.process(f)
+                    f.recycle()
+                    if (o != null) last = o
+                    o ?: last
+                }, progress)
+                seg.close()
+                try { r.release() } catch (_: Exception) {}
+                if (res == null) return@runWork null
+                return@runWork {
+                    val cur = project.byId(id)
+                    if (cur != null) {
+                        project.checkpoint()
+                        if (oldCopy.hasAudio) {
+                            // keep the original sound on its own audio track
+                            oldCopy.kind = LaneKind.AUDIO
+                            oldCopy.keyframes = mutableListOf()
+                            oldCopy.stab = emptyList()
+                            oldCopy.beats = emptyList()
+                            oldCopy.startMs = cur.startMs
+                            project.audio.add(oldCopy)
+                        }
+                        cur.uri = Uri.fromFile(res.file).toString()
+                        cur.srcInMs = 0
+                        cur.srcOutMs = res.durationMs
+                        cur.srcTotalMs = res.durationMs
+                        cur.hasAudio = false
+                        cur.stab = emptyList()
+                        cur.beats = emptyList()
+                        cur.label = "No BG"
+                        project.relayout()
+                        engine.pause()
+                        afterEdit()
+                        toast("Background replaced" + if (oldCopy.hasAudio) " — the original sound is on the audio track" else "")
+                    }
+                }
+            }
+        }
+        dlg = sheet("Remove BG", label("New background"), chipRow, go,
+            label("Finds the person in every frame and replaces everything behind them with a blur or a plain colour. Works best on one person filmed from the chest up (like a selfie) with a clearly different background. It is a simple on-device model: hair and hands can have rough edges, and it will not cut out objects or animals. Works on clips up to 20 s and takes a while. A new video is made, so you can Undo."))
     }
 
     private fun freezeFrame() {
