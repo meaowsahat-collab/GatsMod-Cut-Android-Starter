@@ -556,7 +556,7 @@ class MainActivity : AppCompatActivity() {
         T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
         T(R.drawable.ic_canvas, "Canvas") { canvasDialog() },
         T(R.drawable.ic_autocap, "Auto captions") { soon("Auto captions") },
-        T(R.drawable.ic_star, "Templates") { soon("Templates") }
+        T(R.drawable.ic_star, "Templates") { templatesDialog() }
     )
 
     private fun clipTools(c: Clip): List<T> {
@@ -774,6 +774,87 @@ class MainActivity : AppCompatActivity() {
             slider("Rotation", -180f, 180f, rot, { "${it.toInt()}°" }) { rot = it; put() },
             button("Reset") { c.keyframes = mutableListOf(); scale = 1f; x = 0f; y = 0f; rot = 0f; live() },
             label("Sets one position for the whole clip. For movement over time use Keyframe."))
+    }
+
+    // ============================================================ templates
+
+    private class Tpl(val name: String, val desc: String, val c1: Int, val c2: Int, val apply: (Clip) -> Unit)
+
+    private fun clearLook(c: Clip) {
+        val d = Clip(id = c.id, kind = c.kind)
+        c.filter = d.filter; c.brightness = d.brightness; c.contrast = d.contrast; c.saturation = d.saturation
+        c.blur = d.blur; c.temp = d.temp; c.hue = d.hue; c.lum = d.lum
+        c.chroma = Chroma(); c.fx = 0; c.fxAmount = 0.5f; c.maskShape = 0
+    }
+
+    private fun templatesDialog() {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        val list = listOf(
+            Tpl("Cinematic", "Moody contrast, cool tone, dark corners", 0xFF1F3A4D.toInt(), 0xFF0B1620.toInt()) { c ->
+                c.contrast = 1.15f; c.saturation = 0.9f; c.temp = -0.12f; c.brightness = -0.02f; c.fx = 1; c.fxAmount = 0.55f },
+            Tpl("Vintage", "Sepia colours with film grain", 0xFF8B6B3E.toInt(), 0xFF3E2C14.toInt()) { c ->
+                c.filter = 5; c.contrast = 1.05f; c.fx = 5; c.fxAmount = 0.45f },
+            Tpl("Vlog bright", "Warm, bright and sharp", 0xFFFFB74D.toInt(), 0xFFE65100.toInt()) { c ->
+                c.brightness = 0.04f; c.contrast = 1.08f; c.saturation = 1.2f; c.temp = 0.15f; c.fx = 2; c.fxAmount = 0.4f },
+            Tpl("Noir", "Black and white drama", 0xFF616161.toInt(), 0xFF111111.toInt()) { c ->
+                c.filter = 4; c.contrast = 1.25f; c.fx = 1; c.fxAmount = 0.6f },
+            Tpl("Dreamy", "Soft glow and light colours", 0xFFF48FB1.toInt(), 0xFF7E57C2.toInt()) { c ->
+                c.fx = 8; c.fxAmount = 0.6f; c.saturation = 1.1f; c.brightness = 0.03f },
+            Tpl("Retro VHS", "Glitchy tape look", 0xFF26C6DA.toInt(), 0xFF6A1B9A.toInt()) { c ->
+                c.fx = 4; c.fxAmount = 0.25f; c.saturation = 1.25f; c.temp = 0.1f },
+            Tpl("Neon pop", "Vivid colours, punchy contrast", 0xFFFF4081.toInt(), 0xFF00E5FF.toInt()) { c ->
+                c.filter = 1; c.contrast = 1.15f; c.saturation = 1.5f; c.fx = 2; c.fxAmount = 0.3f },
+            Tpl("Clean sharp", "Crisp and natural", 0xFF90A4AE.toInt(), 0xFF455A64.toInt()) { c ->
+                c.fx = 2; c.fxAmount = 0.6f; c.contrast = 1.05f; c.saturation = 1.1f }
+        )
+        var addTitle = false
+        var dlg: Dialog? = null
+        val grid = LinearLayout(this)
+        grid.orientation = LinearLayout.VERTICAL
+        var row: LinearLayout? = null
+        list.forEachIndexed { i, t ->
+            if (i % 2 == 0) {
+                row = LinearLayout(this)
+                grid.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(84)))
+            }
+            val card = LinearLayout(this)
+            card.orientation = LinearLayout.VERTICAL
+            card.gravity = Gravity.BOTTOM
+            card.setPadding(dp(10), dp(8), dp(10), dp(8))
+            val g = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(t.c1, t.c2))
+            g.cornerRadius = dp(10).toFloat()
+            card.background = g
+            val n = TextView(this)
+            n.text = t.name
+            n.textSize = 15f
+            n.setTypeface(null, Typeface.BOLD)
+            n.setTextColor(Color.WHITE)
+            val d = TextView(this)
+            d.text = t.desc
+            d.textSize = 10f
+            d.setTextColor(0xFFEDEDF2.toInt())
+            card.addView(n)
+            card.addView(d)
+            card.setOnClickListener {
+                engine.pause()
+                project.checkpoint()
+                for (c in project.main) { clearLook(c); t.apply(c); c.fadeInMs = 0; c.fadeOutMs = 0 }
+                project.main.firstOrNull()?.let { it.fadeInMs = min(600L, it.lengthMs / 3) }
+                project.main.lastOrNull()?.let { it.fadeOutMs = min(800L, it.lengthMs / 3) }
+                if (addTitle && project.text.none { it.label == "Title" }) {
+                    project.text.add(Clip(id = project.newId(), kind = LaneKind.TEXT, startMs = 0, text = "My Video", label = "Title",
+                        durMs = min(3000L, project.totalMs()), sizeFrac = 0.09f, posY = 0.5f))
+                }
+                afterEdit()
+                toast("${t.name} applied to ${project.main.size} clip(s)")
+                dlg?.dismiss()
+            }
+            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4))
+            row!!.addView(card, lp)
+        }
+        dlg = sheet("Templates", chips(listOf("No title", "Add title"), 0) { addTitle = it == 1 }, grid,
+            label("A template sets the look of every clip and fades the start and end. Undo brings your old look back."))
     }
 
     private fun resetLook() {
