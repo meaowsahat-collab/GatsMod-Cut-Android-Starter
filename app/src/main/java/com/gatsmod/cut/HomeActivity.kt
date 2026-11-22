@@ -85,7 +85,7 @@ class HomeActivity : AppCompatActivity() {
             row.setPadding(0, dp(14), 0, 0)
             for (i in 0 until 4) {
                 val (ic, name, soonName) = tools[r * 4 + i]
-                row.addView(toolCell(ic, name) { if (soonName.isEmpty()) openEditor(null, false) else toast("$soonName is coming soon") })
+                row.addView(toolCell(ic, name) { if (soonName.isEmpty()) openEditor(null, false) else if (soonName == "Auto captions") toast("Open a video, then tap Auto captions in the bottom toolbar") else toast("$soonName is coming soon") })
             }
             body.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }

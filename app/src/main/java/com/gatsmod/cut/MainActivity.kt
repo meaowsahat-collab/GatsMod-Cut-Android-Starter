@@ -555,7 +555,7 @@ class MainActivity : AppCompatActivity() {
         T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
         T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
         T(R.drawable.ic_canvas, "Canvas") { canvasDialog() },
-        T(R.drawable.ic_autocap, "Auto captions") { soon("Auto captions") },
+        T(R.drawable.ic_autocap, "Auto captions") { autoCaptionsDialog() },
         T(R.drawable.ic_star, "Templates") { templatesDialog() }
     )
 
@@ -1741,6 +1741,69 @@ class MainActivity : AppCompatActivity() {
             c.posY = 0.5f
             afterEdit()
         }, label("Tap a sticker to add it at the playhead. Drag it in the preview to move it."))
+    }
+
+    private var capLang = 0
+
+    private fun autoCaptionsDialog() {
+        val sel = project.selected()
+        val c = (sel?.takeIf { it.isMedia && (it.kind == LaneKind.AUDIO || it.hasAudio) }
+            ?: project.mainClipAt(engine.playheadMs)?.takeIf { it.hasAudio })
+        if (c == null) { toast("Select a clip that has speech (a video with sound, or an audio clip)"); return }
+        val id = c.id
+        val info = TextView(this).apply { setTextColor(0xFFDAD7EA.toInt()); textSize = 13f }
+        fun refreshInfo() {
+            val l = AutoCaptions.LANGS[capLang]
+            info.text = if (AutoCaptions.hasModel(this, l)) "${l.label} model is on your phone — works offline."
+                        else "${l.label} needs a one-time download of about ${l.sizeMb} MB (internet needed only for this)."
+        }
+        refreshInfo()
+        var dlg: Dialog? = null
+        val langs = chips(AutoCaptions.LANGS.map { it.label }, capLang) { capLang = it; refreshInfo() }
+        val go = button("Generate captions") {
+            val cur = project.byId(id) ?: return@button
+            if (cur.srcOutMs - cur.srcInMs > 300000) { toast("Auto captions works on clips up to 5 minutes — cut the clip shorter first"); return@button }
+            dlg?.dismiss()
+            val l = AutoCaptions.LANGS[capLang]
+            val uri = cur.uri; val a = cur.srcInMs; val b = cur.srcOutMs
+            var failedDownload = false
+            runWork("Auto captions (${l.label})") { progress ->
+                var from = 0
+                if (!AutoCaptions.hasModel(this, l)) {
+                    if (!AutoCaptions.download(this, l, progress)) { failedDownload = true; return@runWork null }
+                    from = 70
+                }
+                val words = AutoCaptions.transcribe(this, uri, a, b, l, from, progress) ?: return@runWork null
+                val cues = CaptionMath.cues(words, if (l.spaced) " " else "")
+                return@runWork {
+                    val cl = project.byId(id)
+                    if (cl == null) toast("The clip was removed") else if (cues.isEmpty()) toast("No speech found in this clip")
+                    else {
+                        project.checkpoint()
+                        val t0 = cl.startMs; val t1 = cl.endMs
+                        project.text.removeAll { it.label == "autocap" && it.startMs < t1 && it.endMs > t0 }
+                        for (q in cues) {
+                            val s = (cl.startMs + ((q.s - cl.srcInMs) / cl.speed).toLong()).coerceIn(t0, t1)
+                            val e = (cl.startMs + ((q.e - cl.srcInMs) / cl.speed).toLong()).coerceIn(t0, t1)
+                            if (e - s < 100) continue
+                            project.text.add(Clip(id = project.newId(), kind = LaneKind.TEXT, startMs = s, text = q.text, durMs = e - s,
+                                sizeFrac = 0.05f, posY = 0.88f, label = "autocap"))
+                        }
+                        afterEdit()
+                        toast("${cues.size} caption lines added — tap a line on the text track to edit it")
+                    }
+                }
+            }
+        }
+        val clear = button("Remove auto captions") {
+            val n = project.text.count { it.label == "autocap" }
+            if (n == 0) toast("No auto captions to remove") else {
+                project.checkpoint(); project.text.removeAll { it.label == "autocap" }; afterEdit(); toast("$n lines removed")
+            }
+            dlg?.dismiss()
+        }
+        dlg = sheet("Auto captions", label("Language spoken in the clip"), langs, info, go, clear,
+            label("Listens to the speech on your phone and adds subtitle lines to the text track. It is a small offline model, not a cloud AI: it works best with clear speech and little music, and it will make mistakes, so check and edit the lines. Bengali is not available yet. Adds roughly 30 MB to the app."))
     }
 
     private fun readSrt(u: Uri) {
