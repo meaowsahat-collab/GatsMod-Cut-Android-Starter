@@ -66,7 +66,7 @@ class HomeActivity : AppCompatActivity() {
         // big cards
         val cards = LinearLayout(this)
         cards.addView(bigCard(R.drawable.ic_add, "New video", 1.5f) { openEditor(null, true) })
-        cards.addView(bigCard(R.drawable.ic_photo, "Edit photo", 1f) { toast("Photo editing is coming soon") })
+        cards.addView(bigCard(R.drawable.ic_photo, "Edit photo", 1f) { startActivity(Intent(this, PhotoActivity::class.java)) })
         body.addView(cards, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116)))
 
         // tools grid
