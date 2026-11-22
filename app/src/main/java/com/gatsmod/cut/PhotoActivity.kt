@@ -70,7 +70,7 @@ class PhotoActivity : AppCompatActivity() {
         keys.forEach{k->
             val line=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL}
             line.addView(text(k,12f),LinearLayout.LayoutParams(dp(92),dp(44)))
-            val seek=SeekBar(this).apply{max=200;progress=(values[k] * 100 +100).toInt().coerceIn(0,200)}
+            val seek=SeekBar(this).apply{max=200;progress=(values[k]!! * 100 +100).toInt().coerceIn(0,200)}
             seek.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
                 override fun onProgressChanged(s:SeekBar?,p:Int,from:Boolean){if(from){values[k]=(p-100)/100f;updatePreview()}}
                 override fun onStartTrackingTouch(s:SeekBar?){}
