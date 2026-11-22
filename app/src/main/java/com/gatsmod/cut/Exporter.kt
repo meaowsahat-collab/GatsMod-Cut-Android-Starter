@@ -131,12 +131,20 @@ class Exporter(private val ctx: Context) {
                     fx.add(SpeedChangeEffect(c.speed))
                 }
             }
-            if (c.hasAudio && c.volume != 1f) audioProcs.add(VolumeProcessor(c.volume))
+            if (c.hasAudio && (c.fadeInMs > 0 || c.fadeOutMs > 0)) audioProcs.add(FadeProcessor(c.volume, c.fadeInMs, c.fadeOutMs, c.lengthMs))
+            else if (c.hasAudio && c.volume != 1f) audioProcs.add(VolumeProcessor(c.volume))
             if (c.keyframes.isNotEmpty()) {
                 var first = Long.MIN_VALUE
                 fx.add(KeyframeTransform(c.keyframes) { t ->
                     if (first == Long.MIN_VALUE) first = t
                     (t - first) / 1000L
+                })
+            }
+            if (c.fadeInMs > 0 || c.fadeOutMs > 0) {
+                var first0 = Long.MIN_VALUE
+                fx.add(FadeMatrix(c.fadeInMs, c.fadeOutMs, c.lengthMs) { t ->
+                    if (first0 == Long.MIN_VALUE) first0 = t
+                    (t - first0) / 1000L
                 })
             }
             fx.add(Presentation.createForWidthAndHeight(size.width, size.height, Presentation.LAYOUT_SCALE_TO_FIT))
@@ -163,7 +171,8 @@ class Exporter(private val ctx: Context) {
                 val srcOut = a.srcInMs + (lenMs * a.speed).toLong()
                 val procs = mutableListOf<AudioProcessor>()
                 if (a.speed != 1f) procs.add(Effects.createExperimentalSpeedChangingEffect(ConstantSpeed(a.speed)).first)
-                if (a.volume != 1f) procs.add(VolumeProcessor(a.volume))
+                if (a.fadeInMs > 0 || a.fadeOutMs > 0) procs.add(FadeProcessor(a.volume, a.fadeInMs, a.fadeOutMs, lenMs))
+                else if (a.volume != 1f) procs.add(VolumeProcessor(a.volume))
                 seq.addItem(
                     EditedMediaItem.Builder(clipped(a.uri, a.srcInMs, srcOut))
                         .setRemoveVideo(true)

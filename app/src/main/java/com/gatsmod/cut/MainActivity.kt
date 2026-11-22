@@ -564,23 +564,28 @@ class MainActivity : AppCompatActivity() {
                 split,
                 T(R.drawable.ic_speed, "Speed") { speedDialog() },
                 T(R.drawable.ic_animation, "Animations") { animationDialog() },
+                del,
                 T(R.drawable.ic_volume, "Volume") { volumeDialog() },
+                T(R.drawable.ic_fade, "Fade") { fadeDialog() },
                 T(R.drawable.ic_effects, "Effects") { effectsDialog() },
                 T(R.drawable.ic_filters, "Filters") { filtersDialog() },
                 T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
-                T(R.drawable.ic_hsl, "HSL") { hslDialog() },
                 T(R.drawable.ic_crop, "Crop") { cropDialog() },
                 T(R.drawable.ic_rotate, "Rotate") { rotate() },
-                T(R.drawable.ic_flip, "Flip") { flipDialog() },
+                T(R.drawable.ic_flip, "Mirror") { flipDialog() },
+                T(R.drawable.ic_resize, "Transform") { transformDialog() },
                 T(R.drawable.ic_keyframe, "Keyframe") { keyframeDialog() },
                 T(R.drawable.ic_chroma, "Chroma key") { chromaDialog() },
+                T(R.drawable.ic_hsl, "HSL") { hslDialog() },
                 T(R.drawable.ic_blur, "Blur") { blurDialog() },
                 T(R.drawable.ic_extract, "Extract audio") { extractAudio() },
                 trimS, trimE,
                 T(R.drawable.ic_merge, "Merge") { engine.pause(); result(project.merge()) },
-                dup, del,
+                dup,
                 T(R.drawable.ic_frameback, "Frame back") { step(-1) },
                 T(R.drawable.ic_frameforward, "Frame next") { step(1) },
+                T(R.drawable.ic_color, "Reset look") { resetLook() },
+                T(R.drawable.ic_help, "Info") { clipInfo() },
                 T(R.drawable.ic_reverse, "Reverse") { soon("Reverse") },
                 T(R.drawable.ic_freeze, "Freeze") { soon("Freeze frame") },
                 T(R.drawable.ic_mask, "Mask") { soon("Mask") },
@@ -590,6 +595,7 @@ class MainActivity : AppCompatActivity() {
             LaneKind.AUDIO -> listOf(
                 split,
                 T(R.drawable.ic_volume, "Volume") { volumeDialog() },
+                T(R.drawable.ic_fade, "Fade") { fadeDialog() },
                 T(R.drawable.ic_speed, "Speed") { speedDialog() },
                 trimS, trimE, dup, del
             )
@@ -602,6 +608,60 @@ class MainActivity : AppCompatActivity() {
                 split, dup, del
             )
         }
+    }
+
+    private fun fadeDialog() {
+        val c = need() ?: return
+        if (!c.isMedia) { toast("Fade works on video and audio clips"); return }
+        val maxMs = min(5000f, c.lengthMs / 2f).coerceAtLeast(200f)
+        lookSheet("Fade", c,
+            slider("Fade in", 0f, maxMs, min(c.fadeInMs.toFloat(), maxMs), { "%.1fs".format(it / 1000f) }) { c.fadeInMs = it.toLong(); live() },
+            slider("Fade out", 0f, maxMs, min(c.fadeOutMs.toFloat(), maxMs), { "%.1fs".format(it / 1000f) }) { c.fadeOutMs = it.toLong(); live() },
+            label("Video fades from / to black and the sound fades with it."))
+    }
+
+    private fun transformDialog() {
+        val c = need(true) ?: return
+        val cur = if (c.keyframes.isEmpty()) Keyframe(0) else c.keyframes.first()
+        var scale = cur.scale; var x = cur.x; var y = cur.y; var rot = cur.rot
+        fun put() { c.keyframes = mutableListOf(Keyframe(0, scale, x, y, rot)); live() }
+        lookSheet("Transform", c,
+            slider("Scale", 0.2f, 3f, scale, { "%d%%".format((it * 100).toInt()) }) { scale = it; put() },
+            slider("Position X", -1f, 1f, x, { "%+d".format((it * 100).toInt()) }) { x = it; put() },
+            slider("Position Y", -1f, 1f, y, { "%+d".format((it * 100).toInt()) }) { y = it; put() },
+            slider("Rotation", -180f, 180f, rot, { "${it.toInt()}°" }) { rot = it; put() },
+            button("Reset") { c.keyframes = mutableListOf(); scale = 1f; x = 0f; y = 0f; rot = 0f; live() },
+            label("Sets one position for the whole clip. For movement over time use Keyframe."))
+    }
+
+    private fun resetLook() {
+        val c = need(true) ?: return
+        project.checkpoint()
+        val d = Clip(id = c.id, kind = c.kind)
+        c.filter = d.filter; c.brightness = d.brightness; c.contrast = d.contrast; c.saturation = d.saturation
+        c.blur = d.blur; c.temp = d.temp; c.hue = d.hue; c.lum = d.lum; c.cropRatio = d.cropRatio
+        c.rotation = d.rotation; c.flipH = false; c.flipV = false
+        c.chroma = Chroma(); c.keyframes = mutableListOf(); c.fadeInMs = 0; c.fadeOutMs = 0
+        toast("Look reset")
+        afterEdit()
+    }
+
+    private fun clipInfo() {
+        val c = need() ?: return
+        val v = TextView(this)
+        v.setTextColor(0xFFDAD7EA.toInt())
+        v.textSize = 13f
+        v.text = buildString {
+            append("Name: ${c.label.ifBlank { "-" }}\n")
+            append("On timeline: ${fmt(c.startMs)} – ${fmt(c.endMs)} (${"%.1f".format(c.lengthMs / 1000f)} s)\n")
+            if (c.isMedia) {
+                append("Source range: ${"%.1f".format(c.srcInMs / 1000f)} – ${"%.1f".format(c.srcOutMs / 1000f)} s of ${"%.1f".format(c.srcTotalMs / 1000f)} s\n")
+                append("Speed: ${"%.2f".format(c.speed)}x   Volume: ${(c.volume * 100).toInt()}%\n")
+            }
+            if (c.kind == LaneKind.VIDEO) append("Size: ${c.width}×${c.height}   ${"%.0f".format(c.fps)} fps\n")
+            if (c.keyframes.isNotEmpty()) append("Keyframes: ${c.keyframes.size}\n")
+        }
+        sheet("Clip info", v)
     }
 
     private fun overlaySizeDialog() {
@@ -672,7 +732,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun volumeDialog() {
         val c = need() ?: return
-        lookSheet("Volume", c, slider("Volume", 0f, 2f, c.volume, { "${(it * 100).toInt()}%" }) { c.volume = it; live() })
+        lookSheet("Volume", c, slider("Volume", 0f, 2f, c.volume, { "${(it * 100).toInt()}%" }) { c.volume = it; live() },
+            label("Above 100% is applied when you export; the preview plays at most 100%."))
     }
 
     private fun speedDialog() {

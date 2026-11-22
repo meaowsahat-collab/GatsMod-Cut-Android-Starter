@@ -62,7 +62,9 @@ data class Clip(
     var posY: Float = 0.85f,
     var bold: Boolean = true,
     var font: Int = 0,
-    var durMs: Long = 3000
+    var durMs: Long = 3000,
+    var fadeInMs: Long = 0,
+    var fadeOutMs: Long = 0
 ) {
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
@@ -74,9 +76,19 @@ data class Clip(
 
     /** Everything that changes how the clip looks/sounds in the preview (not its position). */
     fun paramSig(): String =
-        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|" +
+        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|" +
             "${chroma.enabled}|${chroma.key}|${chroma.similarity}|${chroma.smooth}|${chroma.bg}|" +
             keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }
+}
+
+/** Fade in / fade out gain (0..1) at [tMs] inside a clip that is [lenMs] long. */
+object Fade {
+    fun gain(tMs: Long, lenMs: Long, inMs: Long, outMs: Long): Float {
+        var g = 1f
+        if (inMs > 0 && tMs < inMs) g = min(g, max(0L, tMs).toFloat() / inMs)
+        if (outMs > 0 && tMs > lenMs - outMs) g = min(g, max(0L, lenMs - tMs).toFloat() / outMs)
+        return g.coerceIn(0f, 1f)
+    }
 }
 
 object Keyframes {

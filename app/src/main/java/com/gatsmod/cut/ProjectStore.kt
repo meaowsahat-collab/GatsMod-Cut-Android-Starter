@@ -102,6 +102,7 @@ object ProjectStore {
         o.put("text", c.text); o.put("color", c.color); o.put("sizeFrac", c.sizeFrac.toDouble())
         o.put("posX", c.posX.toDouble()); o.put("posY", c.posY.toDouble()); o.put("bold", c.bold); o.put("font", c.font)
         o.put("durMs", c.durMs)
+        o.put("fadeIn", c.fadeInMs); o.put("fadeOut", c.fadeOutMs)
         return o
     }
 
@@ -133,7 +134,8 @@ object ProjectStore {
                     keyframes = kf, width = o.optInt("width"), height = o.optInt("height"), hasAudio = o.optBoolean("hasAudio", true),
                     fps = o.optDouble("fps", 30.0).toFloat(), text = o.optString("text"), color = o.optInt("color", android.graphics.Color.WHITE),
                     sizeFrac = o.optDouble("sizeFrac", 0.06).toFloat(), posX = o.optDouble("posX", 0.5).toFloat(), posY = o.optDouble("posY", 0.85).toFloat(),
-                    bold = o.optBoolean("bold", true), font = o.optInt("font"), durMs = o.optLong("durMs", 3000)
+                    bold = o.optBoolean("bold", true), font = o.optInt("font"), durMs = o.optLong("durMs", 3000),
+                    fadeInMs = o.optLong("fadeIn"), fadeOutMs = o.optLong("fadeOut")
                 )
             )
         }

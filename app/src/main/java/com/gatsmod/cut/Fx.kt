@@ -82,7 +82,16 @@ object Fx {
     fun previewEffects(c: Clip, localMs: () -> Long): List<Effect> {
         val l = lookEffects(c).toMutableList()
         if (c.keyframes.isNotEmpty()) l.add(KeyframeTransform(c.keyframes) { localMs() })
+        if (c.fadeInMs > 0 || c.fadeOutMs > 0) l.add(FadeMatrix(c.fadeInMs, c.fadeOutMs, c.lengthMs) { localMs() })
         return l
+    }
+}
+
+/** Fades the picture from / to black. [localMs] gives the position inside the clip (timeline time). */
+class FadeMatrix(private val inMs: Long, private val outMs: Long, private val lenMs: Long, private val localMs: (Long) -> Long) : RgbMatrix {
+    override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray {
+        val g = Fade.gain(localMs(presentationTimeUs), lenMs, inMs, outMs)
+        return floatArrayOf(g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, 1f)
     }
 }
 
@@ -212,6 +221,33 @@ class VolumeProcessor(private val volume: Float) : BaseAudioProcessor() {
         while (inp.remaining() >= 2) {
             val s = (inp.getShort() * volume).toInt().coerceIn(-32768, 32767)
             out.putShort(s.toShort())
+        }
+        out.flip()
+    }
+}
+
+/** Volume plus fade in / fade out for 16-bit PCM audio. Expects audio already at timeline speed. */
+class FadeProcessor(private val volume: Float, private val inMs: Long, private val outMs: Long, private val lenMs: Long) : BaseAudioProcessor() {
+    private var frames = 0L
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+        return inputAudioFormat
+    }
+
+    override fun onFlush() { frames = 0L }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val size = inputBuffer.remaining()
+        if (size == 0) return
+        val ch = max(1, inputAudioFormat.channelCount)
+        val rate = max(1, inputAudioFormat.sampleRate)
+        val out = replaceOutputBuffer(size).order(ByteOrder.nativeOrder())
+        val inp = inputBuffer.order(ByteOrder.nativeOrder())
+        while (inp.remaining() >= 2 * ch) {
+            val g = volume * Fade.gain(frames * 1000L / rate, lenMs, inMs, outMs)
+            for (i in 0 until ch) out.putShort((inp.getShort() * g).toInt().coerceIn(-32768, 32767).toShort())
+            frames++
         }
         out.flip()
     }

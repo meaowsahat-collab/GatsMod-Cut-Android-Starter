@@ -137,6 +137,10 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
             val c = project.main.getOrNull(player.currentMediaItemIndex)
             if (c != null) playheadMs = (c.startMs + player.currentPosition / c.speed).toLong().coerceIn(0L, project.totalMs())
             applyLook(false)
+            val cur = project.mainClipAt(playheadMs)
+            if (cur != null && (cur.fadeInMs > 0 || cur.fadeOutMs > 0)) {
+                player.volume = cur.volume.coerceAtMost(1f) * Fade.gain(playheadMs - cur.startMs, cur.lengthMs, cur.fadeInMs, cur.fadeOutMs)
+            }
             syncAudio(false)
         }
     }
@@ -195,7 +199,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val key = "${c.id}|${c.paramSig()}"
         if (!force && key == appliedKey) return
         appliedKey = key
-        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|" +
+        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
             "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
             c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" } else "off"
         if (fxKey != appliedFx) {
