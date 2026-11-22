@@ -62,6 +62,9 @@ class MainActivity : AppCompatActivity() {
     private val videoPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadVideo(it) } }
     private val audioPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadAudio(it) } }
     private val imagePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadImage(it) } }
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) voiceoverDialog() else toast("Microphone permission is needed to record a voiceover")
+    }
     private val srtPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); readSrt(it) } }
 
     private fun persist(u: Uri) {
@@ -231,6 +234,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         ui.removeCallbacksAndMessages(null)
+        try { recorder?.release() } catch (_: Exception) {}
         exporter.cancel()
         engine.release()
         Thumbs.clear()
@@ -541,6 +545,7 @@ class MainActivity : AppCompatActivity() {
     private fun mainTools(): List<T> = listOf(
         T(R.drawable.ic_cut, "Edit") { val c = need(); if (c != null) syncUi() },
         T(R.drawable.ic_audio, "Audio") { audioPicker.launch(arrayOf("audio/*")) },
+        T(R.drawable.ic_mic, "Voiceover") { startVoiceover() },
         T(R.drawable.ic_text, "Text") { textDialog() },
         T(R.drawable.ic_effects, "Effects") { effectsDialog() },
         T(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
@@ -567,6 +572,7 @@ class MainActivity : AppCompatActivity() {
                 del,
                 T(R.drawable.ic_volume, "Volume") { volumeDialog() },
                 T(R.drawable.ic_fade, "Fade") { fadeDialog() },
+                T(R.drawable.ic_transitions, "Transition") { transitionDialog() },
                 T(R.drawable.ic_effects, "Effects") { effectsDialog() },
                 T(R.drawable.ic_filters, "Filters") { filtersDialog() },
                 T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
@@ -620,6 +626,18 @@ class MainActivity : AppCompatActivity() {
             label("Video fades from / to black and the sound fades with it."))
     }
 
+    private fun transitionDialog() {
+        val c = need(true) ?: return
+        val next = project.main.getOrNull(project.main.indexOf(c) + 1)
+        if (next == null) { toast("Add another clip after this one first"); return }
+        val maxMs = min(2000f, min(c.lengthMs, next.lengthMs) / 2f).coerceAtLeast(200f)
+        lookSheet("Transition", c,
+            slider("Dip to black", 0f, maxMs, min(c.fadeOutMs.toFloat(), maxMs), { "%.1fs".format(it / 1000f) }) {
+                c.fadeOutMs = it.toLong(); next.fadeInMs = it.toLong(); live()
+            },
+            label("The clip fades out and the next one fades in, picture and sound. A cross-dissolve is not supported yet."))
+    }
+
     private fun transformDialog() {
         val c = need(true) ?: return
         val cur = if (c.keyframes.isEmpty()) Keyframe(0) else c.keyframes.first()
@@ -663,6 +681,92 @@ class MainActivity : AppCompatActivity() {
             if (c.keyframes.isNotEmpty()) append("Keyframes: ${c.keyframes.size}\n")
         }
         sheet("Clip info", v)
+    }
+
+    // ============================================================ voiceover
+
+    private var recorder: android.media.MediaRecorder? = null
+
+    private fun startVoiceover() {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        } else voiceoverDialog()
+    }
+
+    private fun voiceoverDialog() {
+        engine.pause()
+        val startMs = min(engine.playheadMs, max(0L, project.totalMs() - 100))
+        val status = TextView(this)
+        status.setTextColor(0xFFDAD7EA.toInt())
+        status.textSize = 14f
+        status.text = "Tap Record. The video plays while you speak — use headphones to avoid echo."
+        var file: File? = null
+        var began = 0L
+        var recording = false
+        var dlg: Dialog? = null
+        val timer = object : Runnable {
+            override fun run() {
+                if (!recording) return
+                status.text = "Recording…  ${"%.1f".format((System.currentTimeMillis() - began) / 1000f)} s"
+                ui.postDelayed(this, 200)
+            }
+        }
+        fun stopRec(save: Boolean) {
+            if (!recording) return
+            recording = false
+            engine.pause()
+            val r = recorder
+            recorder = null
+            var ok = true
+            try { r?.stop() } catch (_: Exception) { ok = false }
+            try { r?.release() } catch (_: Exception) {}
+            val f = file
+            if (save && ok && f != null && f.exists() && f.length() > 0) {
+                Thread {
+                    val info = MediaProbe.probe(this, Uri.fromFile(f))
+                    runOnUiThread {
+                        val dur = info?.durationMs ?: (System.currentTimeMillis() - began)
+                        project.addFree(Clip(id = project.newId(), kind = LaneKind.AUDIO, startMs = startMs, uri = Uri.fromFile(f).toString(),
+                            srcInMs = 0, srcOutMs = dur, srcTotalMs = dur, label = "Voiceover"))
+                        afterEdit()
+                        toast("Voiceover added")
+                    }
+                }.start()
+            } else if (f != null) f.delete()
+        }
+        val rec = button("●  Record") {
+            if (!recording) {
+                try {
+                    val dir = File(filesDir, "voice").apply { mkdirs() }
+                    val f = File(dir, "VO_" + System.currentTimeMillis() + ".m4a")
+                    file = f
+                    val r = if (android.os.Build.VERSION.SDK_INT >= 31) android.media.MediaRecorder(this) else @Suppress("DEPRECATION") android.media.MediaRecorder()
+                    r.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                    r.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                    r.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                    r.setAudioSamplingRate(44100)
+                    r.setAudioEncodingBitRate(128000)
+                    r.setOutputFile(f.absolutePath)
+                    r.prepare()
+                    r.start()
+                    recorder = r
+                    recording = true
+                    began = System.currentTimeMillis()
+                    engine.seekTo(startMs)
+                    engine.play()
+                    ui.post(timer)
+                } catch (e: Exception) {
+                    recording = false
+                    toast("Could not start recording: ${e.message}")
+                }
+            } else {
+                stopRec(true)
+                dlg?.dismiss()
+            }
+        }
+        dlg = sheet("Voiceover", status, rec, onClose = { stopRec(false) })
     }
 
     private fun overlaySizeDialog() {
