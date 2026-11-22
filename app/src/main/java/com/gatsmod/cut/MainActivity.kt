@@ -587,6 +587,7 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_hsl, "HSL") { hslDialog() },
                 T(R.drawable.ic_blur, "Blur") { blurDialog() },
                 T(R.drawable.ic_extract, "Extract audio") { extractAudio() },
+                T(R.drawable.ic_speed, "Beats") { beatsDialog() },
                 trimS, trimE,
                 T(R.drawable.ic_merge, "Merge") { engine.pause(); result(project.merge()) },
                 dup,
@@ -606,6 +607,7 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_noise, "Denoise") { denoiseDialog() },
                 T(R.drawable.ic_fade, "Fade") { fadeDialog() },
                 T(R.drawable.ic_speed, "Speed") { speedDialog() },
+                T(R.drawable.ic_speed, "Beats") { beatsDialog() },
                 trimS, trimE, dup, del
             )
             LaneKind.TEXT -> listOf(
@@ -617,6 +619,70 @@ class MainActivity : AppCompatActivity() {
                 split, dup, del
             )
         }
+    }
+
+    private fun beatsDialog() {
+        val c = need() ?: return
+        if (!c.isMedia || (c.kind == LaneKind.VIDEO && !c.hasAudio)) { toast("Beats need a clip with sound"); return }
+        val id = c.id
+        val info = TextView(this).apply { setTextColor(0xFFDAD7EA.toInt()); textSize = 14f }
+        fun refresh() {
+            val cur = project.byId(id) ?: return
+            val n = project.beatTimes(cur).size
+            info.text = if (cur.beats.isEmpty()) "No beats found yet. Tap Detect to listen to this clip."
+                        else "$n beats in the used part (yellow marks on the clip)."
+        }
+        refresh()
+        var dlg: Dialog? = null
+        val detect = button("Detect beats") {
+            dlg?.dismiss()
+            val cur = project.byId(id) ?: return@button
+            val uri = cur.uri; val a = cur.srcInMs; val b = cur.srcOutMs
+            runWork("Finding beats") { progress ->
+                val res = BeatDecode.detect(this, uri, a, b, progress) ?: return@runWork null
+                return@runWork {
+                    project.byId(id)?.let { cl ->
+                        project.checkpoint()
+                        cl.beats = cl.beats.filter { it < a || it >= b } + res
+                        afterEdit()
+                        toast(if (res.isEmpty()) "No clear beats found in this clip" else "${res.size} beats found")
+                    }
+                }
+            }
+        }
+        val prev = button("◀ Previous beat") { jumpBeat(id, -1) }
+        val next = button("Next beat ▶") { jumpBeat(id, 1) }
+        val cut = button("Cut video at every beat") {
+            val cur = project.byId(id) ?: return@button
+            val times = project.beatTimes(cur)
+            if (times.isEmpty()) { toast("Detect beats first"); return@button }
+            engine.pause()
+            // audio-lane beats cut the main video track; video-clip beats cut that clip
+            result(project.splitAll(times))
+            dlg?.dismiss()
+        }
+        val every2 = button("Cut at every 2nd beat") {
+            val cur = project.byId(id) ?: return@button
+            val times = project.beatTimes(cur).filterIndexed { i, _ -> i % 2 == 1 }
+            if (times.isEmpty()) { toast("Detect beats first"); return@button }
+            engine.pause()
+            result(project.splitAll(times))
+            dlg?.dismiss()
+        }
+        val clear = button("Clear beats") {
+            project.byId(id)?.let { project.checkpoint(); it.beats = emptyList(); afterEdit(); refresh() }
+        }
+        dlg = sheet("Beats", info, detect, prev, next, cut, every2, clear,
+            label("Beats are found by listening for sudden loud hits, so it works best on music with a clear drum. Cutting on beats splits the video track."))
+    }
+
+    private fun jumpBeat(id: Long, dir: Int) {
+        val c = project.byId(id) ?: return
+        val times = project.beatTimes(c)
+        val now = engine.playheadMs
+        val t = if (dir > 0) times.firstOrNull { it > now + 30 } else times.lastOrNull { it < now - 30 }
+        if (t == null) { toast("No more beats that way"); return }
+        engine.pause(); engine.seekTo(t); syncPlayhead()
     }
 
     private fun denoiseDialog() {

@@ -104,7 +104,7 @@ object ProjectStore {
         o.put("durMs", c.durMs)
         o.put("fadeIn", c.fadeInMs); o.put("fadeOut", c.fadeOutMs)
         o.put("fx", c.fx); o.put("fxAmount", c.fxAmount.toDouble()); o.put("maskShape", c.maskShape); o.put("maskSize", c.maskSize.toDouble())
-        o.put("maskFeather", c.maskFeather.toDouble()); o.put("maskInvert", c.maskInvert); o.put("maskX", c.maskX.toDouble()); o.put("maskY", c.maskY.toDouble()); o.put("denoise", c.denoise.toDouble())
+        o.put("maskFeather", c.maskFeather.toDouble()); o.put("maskInvert", c.maskInvert); o.put("maskX", c.maskX.toDouble()); o.put("maskY", c.maskY.toDouble()); o.put("denoise", c.denoise.toDouble()); o.put("beats", JSONArray(c.beats))
         return o
     }
 
@@ -140,7 +140,8 @@ object ProjectStore {
                     fadeInMs = o.optLong("fadeIn"), fadeOutMs = o.optLong("fadeOut"),
                     fx = o.optInt("fx"), fxAmount = o.optDouble("fxAmount", 0.5).toFloat(), maskShape = o.optInt("maskShape"),
                     maskSize = o.optDouble("maskSize", 0.5).toFloat(), maskFeather = o.optDouble("maskFeather", 0.15).toFloat(),
-                    maskInvert = o.optBoolean("maskInvert"), maskX = o.optDouble("maskX").toFloat(), maskY = o.optDouble("maskY").toFloat(), denoise = o.optDouble("denoise").toFloat()
+                    maskInvert = o.optBoolean("maskInvert"), maskX = o.optDouble("maskX").toFloat(), maskY = o.optDouble("maskY").toFloat(), denoise = o.optDouble("denoise").toFloat(),
+                    beats = o.optJSONArray("beats")?.let { a -> (0 until a.length()).map { a.getLong(it) } } ?: emptyList()
                 )
             )
         }

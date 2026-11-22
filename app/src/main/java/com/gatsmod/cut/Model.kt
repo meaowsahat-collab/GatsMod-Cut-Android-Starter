@@ -73,7 +73,8 @@ data class Clip(
     var maskInvert: Boolean = false,
     var maskX: Float = 0f,
     var maskY: Float = 0f,
-    var denoise: Float = 0f
+    var denoise: Float = 0f,
+    var beats: List<Long> = emptyList()
 ) {
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
@@ -212,6 +213,28 @@ class Project {
         val c = target(atMs) ?: return "Select a clip first"
         if (atMs <= c.startMs + MIN_MS || atMs >= c.endMs - MIN_MS) return "Move the playhead inside the clip to cut"
         checkpoint()
+        doSplit(c, atMs)
+        return null
+    }
+
+    /** Cuts the video track at every time in [times] as ONE undo step. Returns an error message or null. */
+    fun splitAll(times: List<Long>): String? {
+        checkpoint()
+        var n = 0
+        for (t in times.sorted().distinct()) {
+            val c = main.firstOrNull { t > it.startMs + MIN_MS && t < it.endMs - MIN_MS } ?: continue
+            doSplit(c, t)
+            n++
+        }
+        if (n == 0) { discardCheckpoint(); return "No cut points fall inside the video" }
+        return null
+    }
+
+    /** Positions (timeline ms) of the beats found in [c] that are inside the part of it that is used. */
+    fun beatTimes(c: Clip): List<Long> =
+        c.beats.filter { it >= c.srcInMs && it < c.srcOutMs }.map { c.startMs + ((it - c.srcInMs) / c.speed).toLong() }
+
+    private fun doSplit(c: Clip, atMs: Long) {
         val lane = lane(c.kind)
         val tail = c.deepCopy(newId())
         val first = atMs - c.startMs
@@ -238,7 +261,6 @@ class Project {
         lane.add(lane.indexOf(c) + 1, tail)
         if (c.kind == LaneKind.VIDEO) relayout()
         selectedId = c.id
-        return null
     }
 
     fun trimStartTo(atMs: Long): String? {

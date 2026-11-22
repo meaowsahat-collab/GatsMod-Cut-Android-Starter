@@ -264,6 +264,13 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
             canvas.drawText(name, max(r.left, 0f) + dp(8f), ty, label)
         }
         canvas.restore()
+        if (c.beats.isNotEmpty()) {
+            for (bt in (project?.beatTimes(c) ?: emptyList())) {
+                val bx = xOf(bt)
+                if (bx < r.left || bx > r.right) continue
+                canvas.drawRect(bx - dp(0.75f), r.bottom - dp(11f), bx + dp(0.75f), r.bottom - dp(3f), beatPaint)
+            }
+        }
         if (selected) {
             canvas.drawRoundRect(r, rad, rad, outline)
             val hw = dp(7f)
@@ -279,6 +286,8 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
             }
         }
     }
+
+    private val beatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFD54A.toInt() }
 
     private fun trimNum(f: Float): String = if (f == f.toInt().toFloat()) f.toInt().toString() else "%.2f".format(f).trimEnd('0')
 
