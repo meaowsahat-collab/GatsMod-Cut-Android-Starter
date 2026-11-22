@@ -98,7 +98,7 @@ class PhotoActivity : AppCompatActivity() {
     }
     private fun applyPreset(p:String){values.keys.forEach{values[it]=0f};when(p){"Warm"->{values["Temperature"]=0.35f;values["Vibrance"]=0.15f};"Cool"->{values["Temperature"]=-0.35f;values["Contrast"]=0.1f};"Mono"->{values["Saturation"]=-1f;values["Contrast"]=0.15f};"Pop"->{values["Contrast"]=0.2f;values["Vibrance"]=0.35f;values["Saturation"]=0.1f}};refreshPanel();updatePreview()}
     private fun matrix():ColorMatrix{
-        val exp=values["Exposure"]!!*120f;val contrast=(1f+values["Contrast"]!!*0.75f).coerceIn(0.25f,2f);val sat=(1f+values["Saturation"]!!).coerceIn(0f,2f);val vibrance=(1f+values["Vibrance"]!!*0.5f).coerceIn(0f,1.5f);val temp=values["Temperature"]!!*35f;val tint=values["Tint"]!!*25f;val fade=values["Fade"]!!*30f
+        val exp=values["Exposure"]!!*120f + values["Highlights"]!!*35f + values["Shadows"]!!*35f + values["Whites"]!!*30f + values["Blacks"]!!*30f;val contrast=(1f+values["Contrast"]!!*0.75f).coerceIn(0.25f,2f);val sat=(1f+values["Saturation"]!!).coerceIn(0f,2f);val vibrance=(1f+values["Vibrance"]!!*0.5f).coerceIn(0f,1.5f);val temp=values["Temperature"]!!*35f;val tint=values["Tint"]!!*25f;val fade=values["Fade"]!!*30f
         val cm=ColorMatrix();cm.setSaturation((sat*vibrance).coerceIn(0f,2f))
         cm.postConcat(ColorMatrix(floatArrayOf(contrast,0f,0f,0f,exp+fade,0f,contrast,0f,0f,exp+fade,0f,0f,contrast,0f,exp+fade,0f,0f,0f,1f,0f)))
         cm.postConcat(ColorMatrix(floatArrayOf(1f+temp/100f,0f,0f,0f,0f,0f,1f+tint/100f,0f,0f,0f,0f,0f,1f-temp/100f,0f,0f,0f,0f,0f,1f,0f)));return cm
