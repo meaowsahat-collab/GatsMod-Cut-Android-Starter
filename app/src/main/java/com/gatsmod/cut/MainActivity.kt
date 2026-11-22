@@ -26,6 +26,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowInsetsCompat
@@ -59,7 +60,7 @@ class MainActivity : AppCompatActivity() {
     private var fps = 30
     private var fullscreen = false
 
-    private val videoPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadVideo(it) } }
+    private val videoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { u -> u?.let { loadVideo(it) } }
     private val audioPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadAudio(it) } }
     private val imagePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadImage(it) } }
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
@@ -295,7 +296,7 @@ class MainActivity : AppCompatActivity() {
 
     // ============================================================ importing
 
-    private fun pickVideo() = videoPicker.launch(arrayOf("video/*"))
+    private fun pickVideo() = videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
 
     private fun loadVideo(u: Uri) {
         Thread {
