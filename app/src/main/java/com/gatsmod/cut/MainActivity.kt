@@ -1984,7 +1984,8 @@ class MainActivity : AppCompatActivity() {
             bar.setBackgroundColor(0xFF25F4EE.toInt())
             bar.visibility = if (i == tab) View.VISIBLE else View.INVISIBLE
             bar.layoutParams = LinearLayout.LayoutParams(dp(36), dp(2))
-            col.addView(t); col.addView(bar)
+            col.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            col.addView(bar)
             col.setOnClickListener {
                 tab = i
                 tabViews.forEachIndexed { j, v -> v.setTextColor(if (j == tab) white else grey); v.setTypeface(null, if (j == tab) Typeface.BOLD else Typeface.NORMAL) }
@@ -2004,6 +2005,7 @@ class MainActivity : AppCompatActivity() {
         tabRow.addView(tick, LinearLayout.LayoutParams(dp(48), dp(44)))
         val line = View(this)
         line.setBackgroundColor(0xFF2C2C31.toInt())
+        line.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
 
         fillGrid()
         dlg = sheet("", tabRow, line, catScroll, searchBox, scroll, showHeader = false, heightPx = panelH, onClose = {
