@@ -593,8 +593,8 @@ class MainActivity : AppCompatActivity() {
                 T(R.drawable.ic_frameforward, "Frame next") { step(1) },
                 T(R.drawable.ic_color, "Reset look") { resetLook() },
                 T(R.drawable.ic_help, "Info") { clipInfo() },
-                T(R.drawable.ic_reverse, "Reverse") { soon("Reverse") },
-                T(R.drawable.ic_freeze, "Freeze") { soon("Freeze frame") },
+                T(R.drawable.ic_reverse, "Reverse") { reverseClip() },
+                T(R.drawable.ic_freeze, "Freeze") { freezeFrame() },
                 T(R.drawable.ic_mask, "Mask") { maskDialog() },
                 T(R.drawable.ic_removebg, "Remove BG") { soon("Remove background") },
                 T(R.drawable.ic_stabilize, "Stabilize") { soon("Stabilize") }
@@ -625,6 +625,119 @@ class MainActivity : AppCompatActivity() {
             slider("Fade in", 0f, maxMs, min(c.fadeInMs.toFloat(), maxMs), { "%.1fs".format(it / 1000f) }) { c.fadeInMs = it.toLong(); live() },
             slider("Fade out", 0f, maxMs, min(c.fadeOutMs.toFloat(), maxMs), { "%.1fs".format(it / 1000f) }) { c.fadeOutMs = it.toLong(); live() },
             label("Video fades from / to black and the sound fades with it."))
+    }
+
+    // ============================================================ reverse / freeze
+
+    private var workCancel = false
+
+    /** Shows a progress sheet and runs [work] on a background thread. [work] calls progress(0..100) and returns the result action. */
+    private fun runWork(title: String, work: (progress: (Int) -> Boolean) -> (() -> Unit)?) {
+        engine.pause()
+        workCancel = false
+        val status = TextView(this)
+        status.setTextColor(0xFFDAD7EA.toInt())
+        status.textSize = 14f
+        status.text = "Working… 0%"
+        val bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+        bar.max = 100
+        val cancel = button("Cancel") { workCancel = true }
+        val dlg = sheet(title, status, bar, cancel)
+        dlg.setCancelable(false)
+        dlg.setCanceledOnTouchOutside(false)
+        Thread {
+            val done = try {
+                work { p ->
+                    runOnUiThread { bar.progress = p; status.text = "Working… $p%" }
+                    !workCancel
+                }
+            } catch (e: Throwable) { null }
+            runOnUiThread {
+                dlg.dismiss()
+                if (done != null) done() else if (workCancel) toast("Cancelled") else toast("Could not finish this on your phone")
+            }
+        }.start()
+    }
+
+    private fun reverseClip() {
+        val c = need(true) ?: return
+        val srcLen = c.srcOutMs - c.srcInMs
+        if (srcLen > 20000) { toast("Reverse works on clips up to 20 s — cut the clip shorter first"); return }
+        val inMs = c.srcInMs
+        val outMs = c.srcOutMs
+        val uri = c.uri
+        val id = c.id
+        runWork("Reversing clip") { progress ->
+            val r = FrameVideo.openRetriever(this, uri) ?: return@runWork null
+            val fps = 30
+            val n = max(1, (srcLen * fps / 1000L).toInt())
+            val out = File(File(filesDir, "reversed"), "R_" + System.currentTimeMillis() + ".mp4")
+            val res = FrameVideo.write(out, fps, n, 6_000_000, { i ->
+                val t = (outMs - (i + 0.5f) * 1000f / fps).toLong().coerceIn(inMs, outMs - 1)
+                FrameVideo.frameAt(r, t, 1280)
+            }, progress)
+            try { r.release() } catch (_: Exception) {}
+            if (res == null) return@runWork null
+            return@runWork {
+                val cur = project.byId(id)
+                if (cur != null) {
+                    project.checkpoint()
+                    cur.uri = Uri.fromFile(res.file).toString()
+                    cur.srcInMs = 0
+                    cur.srcOutMs = res.durationMs
+                    cur.srcTotalMs = res.durationMs
+                    cur.hasAudio = false
+                    cur.label = "Reversed"
+                    cur.keyframes = cur.keyframes.map { it.copy(tMs = max(0L, cur.lengthMs - it.tMs)) }.sortedBy { it.tMs }.toMutableList()
+                    project.relayout()
+                    engine.pause()
+                    afterEdit()
+                    toast("Clip reversed (the reversed clip has no sound)")
+                }
+            }
+        }
+    }
+
+    private fun freezeFrame() {
+        val c = need(true) ?: return
+        val ph = engine.playheadMs
+        if (ph <= c.startMs + Project.MIN_MS || ph >= c.endMs - Project.MIN_MS) { toast("Move the playhead inside the clip to freeze a frame"); return }
+        val srcMs = c.srcInMs + ((ph - c.startMs) * c.speed).toLong()
+        val uri = c.uri
+        val id = c.id
+        runWork("Freezing frame") { progress ->
+            val r = FrameVideo.openRetriever(this, uri) ?: return@runWork null
+            val bmp = FrameVideo.frameAt(r, srcMs, 1920)
+            try { r.release() } catch (_: Exception) {}
+            if (bmp == null) return@runWork null
+            val fps = 30
+            val n = 3 * fps
+            val out = File(File(filesDir, "freeze"), "F_" + System.currentTimeMillis() + ".mp4")
+            val res = FrameVideo.write(out, fps, n, 4_000_000, { i -> if (i == 0) bmp else null }, progress)
+            if (res == null) return@runWork null
+            return@runWork {
+                val cur = project.byId(id)
+                if (cur != null) {
+                    project.selectedId = cur.id
+                    val err = project.split(ph)
+                    if (err != null) toast(err) else {
+                        val fz = Clip(
+                            id = project.newId(), kind = LaneKind.VIDEO, uri = Uri.fromFile(res.file).toString(),
+                            srcInMs = 0, srcOutMs = res.durationMs, srcTotalMs = res.durationMs, label = "Freeze",
+                            width = if (cur.rotation % 180 != 0) cur.height else cur.width, height = if (cur.rotation % 180 != 0) cur.width else cur.height,
+                            hasAudio = false, fps = fps.toFloat()
+                        )
+                        val idx = project.main.indexOf(cur) + 1
+                        project.main.add(idx, fz)
+                        project.selectedId = fz.id
+                        project.relayout()
+                        engine.pause()
+                        afterEdit()
+                        toast("Frozen for 3 seconds — trim it to change the length")
+                    }
+                }
+            }
+        }
     }
 
     private fun transitionDialog() {

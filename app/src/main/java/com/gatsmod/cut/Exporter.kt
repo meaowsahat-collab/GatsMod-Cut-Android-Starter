@@ -196,8 +196,10 @@ class Exporter(private val ctx: Context) {
         }
         if (overlays.isNotEmpty()) whole.add(OverlayEffect(overlays))
 
+        val mixedAudio = p.main.any { it.hasAudio } && p.main.any { !it.hasAudio }
         return Composition.Builder(sequences)
             .setEffects(Effects(emptyList(), whole))
+            .experimentalSetForceAudioTrack(mixedAudio)
             .build()
     }
 
