@@ -1777,7 +1777,7 @@ class MainActivity : AppCompatActivity() {
         val scroll = ScrollView(this)
         scroll.addView(grid)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(250)))
-        val intensityLabel = label("Intensity · ${(c.fxAmount * 100).toInt()}%")
+        val intensityLabel = label("Intensity · ${(c.fxAmount * 100).toInt()}%") as TextView
         root.addView(intensityLabel)
         val intensity = SeekBar(this).apply { max = 100; progress = (c.fxAmount * 100).toInt() }
         root.addView(intensity)
