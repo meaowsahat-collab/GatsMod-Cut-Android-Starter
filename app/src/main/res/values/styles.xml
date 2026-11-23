@@ -7,4 +7,9 @@
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+    <style name="Theme.GatsModCut.Splash" parent="Theme.GatsModCut">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:statusBarColor">#2F2F2F</item>
+        <item name="android:navigationBarColor">#2F2F2F</item>
+    </style>
 </resources>

@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.GatsModCut.Splash" parent="Theme.GatsModCut">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:windowSplashScreenBackground">#2F2F2F</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_logo_tile</item>
+        <item name="android:statusBarColor">#2F2F2F</item>
+        <item name="android:navigationBarColor">#2F2F2F</item>
+    </style>
+</resources>

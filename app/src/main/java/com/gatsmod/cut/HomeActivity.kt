@@ -34,6 +34,7 @@ class HomeActivity : AppCompatActivity() {
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_GatsModCut)
         super.onCreate(savedInstanceState)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
