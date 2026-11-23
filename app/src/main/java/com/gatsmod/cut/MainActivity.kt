@@ -106,6 +106,37 @@ class MainActivity : AppCompatActivity() {
         overlayView.project = project
         overlayView.onDragStart = { project.checkpoint() }
         overlayView.onDragEnd = { timeline.invalidate() }
+        var gScale = 1f; var gDx = 0f; var gDy = 0f; var gRot = 0f
+        overlayView.onVideoGestureStart = {
+            gScale = 1f; gDx = 0f; gDy = 0f; gRot = 0f
+            engine.pause()
+            project.checkpoint()
+        }
+        overlayView.onVideoGesture = { ds, dx, dy, dr ->
+            gScale = (gScale * ds).coerceIn(0.1f, 8f); gDx += dx; gDy += dy; gRot += dr
+            pv.scaleX = gScale; pv.scaleY = gScale; pv.translationX = gDx; pv.translationY = gDy; pv.rotation = gRot
+        }
+        overlayView.onVideoGestureEnd = {
+            pv.scaleX = 1f; pv.scaleY = 1f; pv.translationX = 0f; pv.translationY = 0f; pv.rotation = 0f
+            val c = project.selected()
+            val moved = abs(gDx) + abs(gDy) > dp(4) || abs(gScale - 1f) > 0.02f || abs(gRot) > 1f
+            if (c == null || c.kind != LaneKind.VIDEO || !moved) project.discardCheckpoint()
+            else {
+                val rc = overlayView.canvasRect()
+                val local = (engine.playheadMs - c.startMs).coerceAtLeast(0L)
+                val cur = if (c.keyframes.isEmpty()) Keyframe(0) else Keyframes.valueAt(c.keyframes, local)
+                val k = Keyframe(
+                    if (c.keyframes.size <= 1) 0L else local,
+                    (cur.scale * gScale).coerceIn(0.1f, 8f),
+                    cur.x + 2f * gDx / max(1f, rc.width()),
+                    cur.y - 2f * gDy / max(1f, rc.height()),
+                    cur.rot + gRot
+                )
+                if (c.keyframes.size <= 1) c.keyframes = mutableListOf(k) else project.setKeyframe(c, k)
+                live()
+                afterEdit()
+            }
+        }
 
         engine.listener = object : PreviewEngine.Listener {
             override fun onPlayingChanged(playing: Boolean) {
@@ -527,7 +558,10 @@ class MainActivity : AppCompatActivity() {
             w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, if (heightPx > 0) heightPx else WindowManager.LayoutParams.WRAP_CONTENT)
             w.setGravity(Gravity.BOTTOM)
             w.setDimAmount(0.0f)
+            // tapping or pinching the video above the panel must not close the tool
+            w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
         }
+        d.setCanceledOnTouchOutside(false)
         d.show()
         return d
     }

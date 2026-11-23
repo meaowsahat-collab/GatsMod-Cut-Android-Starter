@@ -156,9 +156,57 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
         }
     }
 
+    /** Gesture on the selected video clip: (scale factor, dx px, dy px, rotation deg), all since the last call. */
+    var onVideoGesture: ((Float, Float, Float, Float) -> Unit)? = null
+    var onVideoGestureStart: (() -> Unit)? = null
+    var onVideoGestureEnd: (() -> Unit)? = null
+    private var gesturing = false
+    private var lastDist = 1f
+    private var lastAngle = 0f
+    private var lastMx = 0f
+    private var lastMy = 0f
+
+    fun canvasRect(): RectF = videoRect()
+
+    private fun dist(e: MotionEvent) = Math.hypot((e.getX(1) - e.getX(0)).toDouble(), (e.getY(1) - e.getY(0)).toDouble()).toFloat().coerceAtLeast(1f)
+    private fun angle(e: MotionEvent) = Math.toDegrees(Math.atan2((e.getY(1) - e.getY(0)).toDouble(), (e.getX(1) - e.getX(0)).toDouble())).toFloat()
+
+    /** One finger moves the video, two fingers pinch to resize and twist to rotate it. */
+    private fun videoTouch(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { gesturing = true; lastMx = e.x; lastMy = e.y; onVideoGestureStart?.invoke() }
+            MotionEvent.ACTION_POINTER_DOWN -> if (e.pointerCount >= 2) {
+                lastDist = dist(e); lastAngle = angle(e)
+                lastMx = (e.getX(0) + e.getX(1)) / 2f; lastMy = (e.getY(0) + e.getY(1)) / 2f
+            }
+            MotionEvent.ACTION_MOVE -> if (gesturing) {
+                if (e.pointerCount >= 2) {
+                    val d = dist(e); val a = angle(e)
+                    val mx = (e.getX(0) + e.getX(1)) / 2f; val my = (e.getY(0) + e.getY(1)) / 2f
+                    var da = a - lastAngle
+                    while (da > 180f) da -= 360f
+                    while (da < -180f) da += 360f
+                    onVideoGesture?.invoke(d / lastDist, mx - lastMx, my - lastMy, da)
+                    lastDist = d; lastAngle = a; lastMx = mx; lastMy = my
+                } else {
+                    onVideoGesture?.invoke(1f, e.x - lastMx, e.y - lastMy, 0f)
+                    lastMx = e.x; lastMy = e.y
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val keep = if (e.actionIndex == 0) 1 else 0
+                if (keep < e.pointerCount) { lastMx = e.getX(keep); lastMy = e.getY(keep) }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (gesturing) { gesturing = false; onVideoGestureEnd?.invoke() }
+        }
+        return true
+    }
+
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val p = project ?: return false
         val r = videoRect()
+        val vs = p.selected()
+        if (vs != null && vs.kind == LaneKind.VIDEO && p.mainClipAt(playheadMs)?.id == vs.id) return videoTouch(e)
         when (e.action) {
             MotionEvent.ACTION_DOWN -> {
                 val s = p.selected() ?: return false
