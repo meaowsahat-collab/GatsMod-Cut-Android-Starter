@@ -303,9 +303,10 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
         snapX = Math.abs(rawX) < snap; snapY = Math.abs(rawY) < snap
         val ex = if (snapX) 0f else rawX
         val ey = if (snapY) 0f else rawY
-        var er = rawR
-        val near = Math.round(rawR / 90f) * 90f
-        if (Math.abs(rawR - near) < 4f) er = near
+        // small accidental twists while pinching are ignored; a real twist starts after 8 degrees
+        var er = if (Math.abs(rawR) < 8f) 0f else rawR - Math.signum(rawR) * 8f
+        val near = Math.round(er / 90f) * 90f
+        if (Math.abs(er - near) < 4f) er = near
         val es = if (Math.abs(rawS - 1f) < 0.03f) 1f else rawS
         effS = es; effX = ex; effY = ey; effR = er
         onVideoGesture?.invoke(es, ex, ey, er)
@@ -336,7 +337,7 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
                     var da = a - lastAngle
                     while (da > 180f) da -= 360f
                     while (da < -180f) da += 360f
-                    rawS = (rawS * d / lastDist).coerceIn(0.1f, 8f); rawX += mx - lastMx; rawY += my - lastMy; rawR += da
+                    rawS = (rawS * d / lastDist).coerceIn(0.1f, 8f); rawR += da   // two fingers only zoom/twist: the picture stays centred
                     lastDist = d; lastAngle = a; lastMx = mx; lastMy = my
                 } else {
                     rawX += e.x - lastMx; rawY += e.y - lastMy
