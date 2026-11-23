@@ -2429,19 +2429,20 @@ class MainActivity : AppCompatActivity() {
             fill()
         }
 
-        fun giphyBody() {
+        fun giphyBody(problem: String = "") {
             body.removeAllViews()
             val key = Giphy.key(this)
-            if (key.isBlank()) {
+            if (problem.isNotBlank()) {
                 val pad = dp(10)
-                val info = label("GIPHY has thousands of animated stickers. It needs a free key from GIPHY:\n1. Open developers.giphy.com and create an account\n2. Tap Create an App, choose API, copy the key\n3. Paste it here once")
+                val info = label(problem + "\n\nTo fix it once and for all, get a free key from GIPHY:\n1. Open developers.giphy.com and create an account\n2. Tap Create an App, choose API, copy the key\n3. Paste it here")
                 info.setPadding(pad, dp(10), pad, dp(6))
                 val keyBox = searchBox("Paste your GIPHY API key") { }
                 val save = button("Save key") {
                     val k = keyBox.text.toString().trim()
                     if (k.length < 10) toast("That does not look like a GIPHY key") else { Giphy.setKey(this, k); giphyBody() }
                 }
-                body.addView(info); body.addView(keyBox); body.addView(save)
+                val retry = button("Try again") { giphyBody() }
+                body.addView(info); body.addView(keyBox); body.addView(save); body.addView(retry)
                 return
             }
             val g = newGrid()
@@ -2456,7 +2457,11 @@ class MainActivity : AppCompatActivity() {
                 Thread {
                     val items = try { Giphy.load(key, q) } catch (e: Throwable) { null }
                     runOnUiThread {
-                        if (items == null) { status.text = "Could not load GIPHY. Check the internet and the key."; return@runOnUiThread }
+                        if (items == null) {
+                            if (Giphy.ownKey(this).isBlank()) giphyBody("GIPHY did not answer with its shared test key (no internet, or GIPHY limited / switched it off).")
+                            else status.text = "Could not load GIPHY. Check the internet and your key."
+                            return@runOnUiThread
+                        }
                         status.text = if (items.isEmpty()) "Nothing found" else if (q.isBlank()) "Trending — tap one to add it" else "Results for \"$q\""
                         for (it in items) {
                             val iv = ImageView(this)
