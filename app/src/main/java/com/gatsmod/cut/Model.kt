@@ -252,6 +252,34 @@ class Project {
     fun beatTimes(c: Clip): List<Long> =
         c.beats.filter { it >= c.srcInMs && it < c.srcOutMs }.map { c.startMs + ((it - c.srcInMs) / c.speed).toLong() }
 
+    /** Replaces video clip [c] by pieces with different constant speeds: (end fraction of the source, speed). One undo step. */
+    fun speedCurve(c: Clip, segs: List<Pair<Float, Float>>): String? {
+        if (c.kind != LaneKind.VIDEO) return "Speed curves work on video clips"
+        val src = c.srcOutMs - c.srcInMs
+        if (src < 800L) return "This clip is too short for a speed curve"
+        checkpoint()
+        val lane = main
+        val at = lane.indexOf(c)
+        val pieces = ArrayList<Clip>()
+        var from = c.srcInMs
+        segs.forEachIndexed { i, (endFrac, sp) ->
+            val to = if (i == segs.lastIndex) c.srcOutMs else c.srcInMs + (src * endFrac).toLong()
+            if (to - from < 60L) return@forEachIndexed
+            val p = c.deepCopy(if (pieces.isEmpty()) c.id else newId())
+            p.srcInMs = from; p.srcOutMs = to; p.speed = sp
+            p.keyframes = mutableListOf()
+            if (pieces.isNotEmpty()) { p.animIn = 0; p.fadeInMs = 0 }
+            pieces.add(p)
+            from = to
+        }
+        pieces.forEachIndexed { i, p -> if (i != pieces.lastIndex) { p.animOut = 0; p.fadeOutMs = 0 } }
+        lane.removeAt(at)
+        lane.addAll(at, pieces)
+        relayout()
+        selectedId = pieces.first().id
+        return null
+    }
+
     private fun doSplit(c: Clip, atMs: Long) {
         val lane = lane(c.kind)
         val tail = c.deepCopy(newId())

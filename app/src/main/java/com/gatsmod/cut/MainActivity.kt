@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity() {
     private var projectName = "Project"
     private var resShort = 1080
     private var fps = 30
+    private var quality = 1f
     private var fullscreen = false
 
     private val videoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { u -> u?.let { loadVideo(it) } }
@@ -1030,7 +1031,15 @@ class MainActivity : AppCompatActivity() {
             slider("Dip to black", 0f, maxMs, min(c.fadeOutMs.toFloat(), maxMs), { "%.1fs".format(it / 1000f) }) {
                 c.fadeOutMs = it.toLong(); next.fadeInMs = it.toLong(); live()
             },
-            label("The clip fades out and the next one fades in, picture and sound. A cross-dissolve is not supported yet."))
+            label("Dip to black: the clip fades out and the next one fades in, picture and sound."),
+            label("Transition styles (the two clips move out / in together)"),
+            chips(listOf("None", "Zoom", "Slide left", "Slide right", "Slide up", "Spin", "Flip", "Glitch", "Pop", "Flash"), -1) { i ->
+                val pairs = listOf(0 to 0, 1001 to 1, 1007 to 8, 1008 to 7, 1009 to 10, 1004 to 4, 1017 to 17, 1014 to 14, 1002 to 2, 1005 to 5)
+                val (o, n) = pairs[i]
+                c.animOut = o; next.animIn = n
+                if (i > 0) { c.animOutMs = maxMs.toLong().coerceAtMost(700L); next.animInMs = c.animOutMs }
+                live(); afterEdit()
+            })
     }
 
     private fun transformDialog() {
@@ -1269,20 +1278,23 @@ class MainActivity : AppCompatActivity() {
     private fun toolbarKeyNow(): String = project.selected()?.kind?.name ?: "none"
 
     private fun refreshRes() {
-        val base = when (resShort) { 720 -> "720P"; 1080 -> "1080P"; else -> "4K" }
+        val base = when (resShort) { 480 -> "480P"; 720 -> "720P"; 1080 -> "1080P"; 1440 -> "2K"; else -> "4K" }
         findViewById<TextView>(R.id.resChip).text = "$base ▾"
     }
 
     private fun exportSettingsDialog() {
-        val sizes = listOf(720, 1080, 2160)
+        val sizes = listOf(480, 720, 1080, 1440, 2160)
         val opts = listOf(24, 30, 60)
+        val qs = floatArrayOf(0.6f, 1f, 1.6f, 2.5f)
         sheet("Export settings",
             label("Resolution"),
-            chips(listOf("720P", "1080P", "4K"), sizes.indexOf(resShort)) { resShort = sizes[it]; refreshRes() },
+            chips(listOf("480P", "720P", "1080P", "2K", "4K"), sizes.indexOf(resShort)) { resShort = sizes[it]; refreshRes() },
             label("Frame rate"),
             chips(opts.map { "$it fps" }, opts.indexOf(fps)) { fps = opts[it]; refreshRes() },
-            label("Frames are only dropped, never invented: a 30 fps video stays 30 fps even if you pick 60."),
-            label("HDR export is coming soon."))
+            label("Quality (bitrate)"),
+            chips(listOf("Low", "Standard", "High", "Max"), qs.indexOfFirst { it == quality }) { quality = qs[it] },
+            label("Higher quality gives a sharper video and a bigger file. Frames are only dropped, never invented: a 30 fps video stays 30 fps even if you pick 60."),
+            label("2K / 4K export depends on what your phone's video encoder supports."))
     }
 
     // ============================================================ edit tools
@@ -1326,7 +1338,20 @@ class MainActivity : AppCompatActivity() {
         val presets = chips(listOf("0.25x", "0.5x", "1x", "2x", "3x", "4x"), -1) {
             project.setSpeed(c, floatArrayOf(0.25f, 0.5f, 1f, 2f, 3f, 4f)[it]); live(); syncUi()
         }
-        sheet("Speed", d, presets, label("Changes the length of the clip. Audio speed is changed too."), onClose = {
+        val curves = linkedMapOf(
+            "Montage" to listOf(.2f to 1f, .4f to 2f, .6f to .5f, .8f to 2f, 1f to 1f),
+            "Hero" to listOf(.25f to 1f, .35f to .7f, .65f to .35f, .75f to .7f, 1f to 1f),
+            "Bullet" to listOf(.3f to 1.5f, .4f to .7f, .55f to .25f, .7f to .7f, 1f to 1.5f),
+            "Jump cut" to listOf(.2f to 1f, .4f to 3f, .6f to 1f, .8f to 3f, 1f to 1f),
+            "Flash in" to listOf(.2f to .4f, .4f to .7f, .6f to 1.2f, .8f to 2f, 1f to 3f),
+            "Flash out" to listOf(.2f to 3f, .4f to 2f, .6f to 1.2f, .8f to .7f, 1f to .4f))
+        val names = curves.keys.toList()
+        val curveRow = chips(names, -1) { i ->
+            val err = project.speedCurve(c, curves[names[i]]!!)
+            if (err != null) toast(err) else { engine.pause(); afterEdit(); toast("${names[i]} curve applied (undo to revert)") }
+        }
+        sheet("Speed", d, presets, label("Speed curve (the clip is split into pieces with different speeds)"), curveRow,
+            label("Changes the length of the clip. Audio speed is changed too. Curves change speed in steps, not as a smooth ramp."), onClose = {
             if (c.speed == before) project.discardCheckpoint()
             project.relayout()
             afterEdit()
@@ -2823,7 +2848,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         ui.post(poll)
-        exporter.start(project, ExportSettings(resShort, fps), object : Exporter.Callback {
+        exporter.start(project, ExportSettings(resShort, fps, quality), object : Exporter.Callback {
             override fun onDone(file: File) {
                 finished = true
                 Thread {

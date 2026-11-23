@@ -38,7 +38,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-class ExportSettings(val shortSide: Int, val fps: Int)
+class ExportSettings(val shortSide: Int, val fps: Int, val quality: Float = 1f)
 
 /** Turns the project into a real MP4 using Media3 Transformer (same effects as the preview). */
 class Exporter(private val ctx: Context) {
@@ -86,9 +86,11 @@ class Exporter(private val ctx: Context) {
         }
         val bitrate = ((when {
             s.shortSide >= 2000 -> 35_000_000
+            s.shortSide >= 1300 -> 18_000_000
             s.shortSide >= 1000 -> 10_000_000
-            else -> 5_000_000
-        }) * (s.fps / 30f).coerceIn(0.8f, 2f)).toInt()
+            s.shortSide >= 600 -> 5_000_000
+            else -> 2_500_000
+        }) * (s.fps / 30f).coerceIn(0.8f, 2f) * s.quality).toInt().coerceIn(1_500_000, 60_000_000)
         val encoder = DefaultEncoderFactory.Builder(ctx)
             .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(bitrate).build())
             .build()
