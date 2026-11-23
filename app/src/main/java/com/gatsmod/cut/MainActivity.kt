@@ -626,6 +626,7 @@ class MainActivity : AppCompatActivity() {
         T(R.drawable.ic_effects, "Effects") { effectsDialog() },
         T(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
         T(R.drawable.ic_captions, "Captions") { srtPicker.launch(arrayOf("*/*")) },
+        T(R.drawable.ic_animation, "Animations") { animationDialog() },
         T(R.drawable.ic_mic, "Voiceover") { startVoiceover() },
         T(R.drawable.ic_filters, "Filters") { filtersDialog() },
         T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
