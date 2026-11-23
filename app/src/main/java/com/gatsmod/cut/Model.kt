@@ -82,7 +82,15 @@ data class Clip(
     var animInMs: Long = 600,
     var animOut: Int = 0,
     var animOutMs: Long = 600,
-    var animCombo: Int = 0
+    var animCombo: Int = 0,
+    // text styling (also used for stickers: tilt)
+    var strokeColor: Int = 0,
+    var strokeW: Float = 0.08f,
+    var bgColor: Int = 0,
+    var shadow: Boolean = true,
+    var italic: Boolean = false,
+    var textFx: Int = 0,
+    var tilt: Float = 0f
 ) {
     val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO

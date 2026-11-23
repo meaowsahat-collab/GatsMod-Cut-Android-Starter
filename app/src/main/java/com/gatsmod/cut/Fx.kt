@@ -35,7 +35,7 @@ object Fx {
     val CROP_NAMES = listOf("Original", "1:1", "9:16", "16:9", "4:5", "4:3")
     val CROP_RATIOS = listOf(0f, 1f, 9f / 16f, 16f / 9f, 4f / 5f, 4f / 3f)
 
-    val FONT_NAMES = listOf("Sans", "Serif", "Mono", "Cursive", "Condensed", "Casual")
+    val FONT_NAMES = listOf("Sans", "Serif", "Mono", "Cursive", "Condensed", "Casual", "Black", "Light", "Medium", "Thin")
 
     /** Rotate/flip, crop, chroma key, colour adjustments, filter preset and blur for one clip. */
     fun lookEffects(c: Clip): List<Effect> {

@@ -35,6 +35,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.RectF
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
@@ -107,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         overlayView.project = project
         overlayView.onDragStart = { project.checkpoint() }
         overlayView.onDragEnd = { timeline.invalidate() }
+        overlayView.onDelete = { engine.pause(); result(project.delete()) }
         var gScale = 1f; var gDx = 0f; var gDy = 0f; var gRot = 0f
         overlayView.onVideoGestureStart = {
             gScale = 1f; gDx = 0f; gDy = 0f; gRot = 0f
@@ -683,10 +686,12 @@ class MainActivity : AppCompatActivity() {
             )
             LaneKind.TEXT -> listOf(
                 T(R.drawable.ic_text, "Edit") { textDialog() },
+                T(R.drawable.ic_animation, "Animations") { animationsFor(c) },
                 split, dup, del
             )
             LaneKind.OVERLAY -> listOf(
                 T(R.drawable.ic_resize, "Size") { overlaySizeDialog() },
+                T(R.drawable.ic_animation, "Animations") { animationsFor(c) },
                 split, dup, del
             )
         }
@@ -1886,9 +1891,9 @@ class MainActivity : AppCompatActivity() {
                 1 -> Anim.OUT.map { it.def.id to it.def }
                 else -> Anim.COMBO.map { it.id to it }
             }
-            if (query.isNotBlank()) return src.filter { it.second.name.contains(query.trim(), ignoreCase = true) }
+            if (query.isNotBlank()) return src.filter { it.second.name.contains(query.trim(), ignoreCase = true) && (c.kind == LaneKind.VIDEO || !Anim.isMask(it.first)) }
             val key = Anim.CATS[cat]
-            return src.filter { key in it.second.cats.split(",") }
+            return src.filter { key in it.second.cats.split(",") && (c.kind == LaneKind.VIDEO || !Anim.isMask(it.first)) }
         }
 
         fun tile(id: Int, name: String): View {
@@ -2066,45 +2071,352 @@ class MainActivity : AppCompatActivity() {
         return c
     }
 
+    // ============================================================ docked panels (text / stickers)
+
+    private fun dockHeight(): Int {
+        val loc = IntArray(2)
+        controlsRow().getLocationOnScreen(loc)
+        val content = findViewById<View>(android.R.id.content)
+        val cl = IntArray(2); content.getLocationOnScreen(cl)
+        return (cl[1] + content.height - (loc[1] + controlsRow().height)).coerceIn(dp(260), dp(560))
+    }
+
+    private fun tabBar(names: List<String>, start: Int, textSp: Float, onPick: (Int) -> Unit): View {
+        val white = 0xFFFFFFFF.toInt(); val grey = 0xFF8E8E93.toInt()
+        val hs = HorizontalScrollView(this)
+        hs.isHorizontalScrollBarEnabled = false
+        val row = LinearLayout(this)
+        row.orientation = LinearLayout.HORIZONTAL
+        val tvs = ArrayList<TextView>(); val bars = ArrayList<View>()
+        names.forEachIndexed { i, n ->
+            val col = LinearLayout(this)
+            col.orientation = LinearLayout.VERTICAL
+            col.gravity = Gravity.CENTER_HORIZONTAL
+            val t = TextView(this)
+            t.text = n
+            t.textSize = textSp
+            t.setPadding(dp(12), dp(8), dp(12), dp(6))
+            t.setTextColor(if (i == start) white else grey)
+            t.setTypeface(null, if (i == start) Typeface.BOLD else Typeface.NORMAL)
+            val bar = View(this)
+            bar.setBackgroundColor(0xFF25F4EE.toInt())
+            bar.visibility = if (i == start) View.VISIBLE else View.INVISIBLE
+            col.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            col.addView(bar, LinearLayout.LayoutParams(dp(32), dp(2)))
+            col.setOnClickListener {
+                tvs.forEachIndexed { j, v -> v.setTextColor(if (j == i) white else grey); v.setTypeface(null, if (j == i) Typeface.BOLD else Typeface.NORMAL) }
+                bars.forEachIndexed { j, v -> v.visibility = if (j == i) View.VISIBLE else View.INVISIBLE }
+                onPick(i)
+            }
+            tvs.add(t); bars.add(bar)
+            row.addView(col)
+        }
+        hs.addView(row)
+        return hs
+    }
+
+    /** One grid cell: a dark rounded square holding [content], with a name below; white border when [on]. */
+    private fun gridCell(w: Int, content: View, name: String, on: Boolean, onClick: () -> Unit): View {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.gravity = Gravity.CENTER_HORIZONTAL
+        box.setPadding(dp(6), dp(6), dp(6), dp(4))
+        val side = w - dp(12)
+        val holder = FrameLayout(this)
+        val bg = GradientDrawable()
+        bg.cornerRadius = dp(10).toFloat()
+        bg.setColor(0xFF26262B.toInt())
+        if (on) bg.setStroke(dp(2), 0xFFFFFFFF.toInt())
+        holder.background = bg
+        holder.addView(content, FrameLayout.LayoutParams(side, side))
+        box.addView(holder, LinearLayout.LayoutParams(side, side))
+        if (name.isNotEmpty()) {
+            val nm = TextView(this)
+            nm.text = name; nm.textSize = 11f; nm.maxLines = 1
+            nm.ellipsize = android.text.TextUtils.TruncateAt.END
+            nm.gravity = Gravity.CENTER
+            nm.setTextColor(if (on) 0xFFFFFFFF.toInt() else 0xFF8E8E93.toInt())
+            nm.setPadding(0, dp(4), 0, 0)
+            box.addView(nm, LinearLayout.LayoutParams(side, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        box.layoutParams = android.widget.GridLayout.LayoutParams().apply { width = w; height = ViewGroup.LayoutParams.WRAP_CONTENT }
+        box.setOnClickListener { onClick() }
+        return box
+    }
+
+    private fun pictureCell(bmp: Bitmap?): View {
+        val iv = ImageView(this)
+        iv.scaleType = ImageView.ScaleType.FIT_CENTER
+        iv.setPadding(dp(4), dp(4), dp(4), dp(4))
+        if (bmp != null) iv.setImageBitmap(bmp)
+        return iv
+    }
+
+    // ---------------------------------------------------------------- text
+
+    private class TextTpl(val name: String, val cat: String, val font: Int, val color: Int, val stroke: Int, val strokeW: Float,
+                          val bg: Int, val shadow: Boolean, val fx: Int, val bold: Boolean = true, val italic: Boolean = false)
+
+    private val textTemplates = listOf(
+        TextTpl("Neon blue", "Trending", 6, 0xFF40C4FF.toInt(), 0, 0.08f, 0, false, 1),
+        TextTpl("Neon pink", "Trending", 6, 0xFFFF4081.toInt(), 0, 0.08f, 0, false, 1),
+        TextTpl("Yellow pop", "Trending", 6, 0xFFFFEB3B.toInt(), 0xFF000000.toInt(), 0.12f, 0, false, 0),
+        TextTpl("Red impact", "Trending", 6, 0xFFFFFFFF.toInt(), 0xFFD50000.toInt(), 0.12f, 0, false, 0),
+        TextTpl("Glitch", "Trending", 6, 0xFFFFFFFF.toInt(), 0, 0.08f, 0, false, 3),
+        TextTpl("Gradient", "Trending", 6, 0xFFFFFFFF.toInt(), 0xFF000000.toInt(), 0.06f, 0, false, 5),
+        TextTpl("Outline", "Trending", 6, 0xFFFFFFFF.toInt(), 0, 0.08f, 0, false, 4),
+        TextTpl("Long shadow", "Trending", 6, 0xFFFFFFFF.toInt(), 0, 0.08f, 0, false, 2),
+        TextTpl("Classic", "Basic", 0, 0xFFFFFFFF.toInt(), 0, 0.08f, 0, true, 0),
+        TextTpl("Black on white", "Basic", 8, 0xFF000000.toInt(), 0, 0.08f, 0xFFFFFFFF.toInt(), false, 0),
+        TextTpl("White on black", "Basic", 8, 0xFFFFFFFF.toInt(), 0, 0.08f, 0xCC000000.toInt(), false, 0),
+        TextTpl("Subtitle", "Basic", 8, 0xFFFFEB3B.toInt(), 0xFF000000.toInt(), 0.08f, 0, false, 0),
+        TextTpl("Typewriter", "Basic", 2, 0xFFFFFFFF.toInt(), 0, 0.08f, 0x99000000.toInt(), false, 0, false),
+        TextTpl("Handwritten", "Basic", 3, 0xFFFFFFFF.toInt(), 0, 0.08f, 0, true, 0, false),
+        TextTpl("Elegant", "Fancy", 1, 0xFFFFFFFF.toInt(), 0, 0.08f, 0, true, 0, false, true),
+        TextTpl("Retro", "Fancy", 5, 0xFFFFC107.toInt(), 0xFF6A1B9A.toInt(), 0.12f, 0, false, 0),
+        TextTpl("Mint", "Fancy", 6, 0xFF69F0AE.toInt(), 0xFF004D40.toInt(), 0.1f, 0, false, 0),
+        TextTpl("Comic", "Fancy", 5, 0xFFFFEB3B.toInt(), 0xFF000000.toInt(), 0.15f, 0, false, 0)
+    )
+
+    private fun styleSample(base: Clip, text: String): Bitmap? {
+        val t = base.deepCopy(-1L)
+        t.text = text; t.sizeFrac = 0.16f; t.tilt = 0f
+        return try { OverlayRenderer.renderText(t, 360, 360) } catch (_: Throwable) { null }
+    }
+
+    private fun applyTpl(c: Clip, t: TextTpl) {
+        c.font = t.font; c.color = t.color; c.strokeColor = t.stroke; c.strokeW = t.strokeW
+        c.bgColor = t.bg; c.shadow = t.shadow; c.textFx = t.fx; c.bold = t.bold; c.italic = t.italic
+    }
+
     private fun textDialog() {
         var c = project.selected()?.takeIf { it.kind == LaneKind.TEXT }
         val fresh = c == null
         if (c == null) c = newFree(LaneKind.TEXT, "Your text") ?: return else project.checkpoint()
         val clip = c
+        engine.pause()
+        val white = 0xFFFFFFFF.toInt(); val grey = 0xFF8E8E93.toInt()
+        val tileW = (resources.displayMetrics.widthPixels - dp(24)) / 4
+        var dlg: Dialog? = null
+        var tab = 0
+        var tplCat = 0
+
+        fun changed() { overlayView.invalidate(); timeline.invalidate() }
+
         val edit = EditText(this)
         edit.setText(clip.text)
-        edit.setTextColor(Color.WHITE)
-        edit.setHintTextColor(0xFF8E8AA8.toInt())
-        edit.hint = "Type here"
+        edit.setTextColor(white)
+        edit.setHintTextColor(grey)
+        edit.hint = "Enter text"
+        edit.textSize = 16f
         edit.setSelection(edit.text.length)
+        val eb = GradientDrawable(); eb.cornerRadius = dp(10).toFloat(); eb.setColor(0xFF2C2C31.toInt())
+        edit.background = eb
+        edit.setPadding(dp(14), dp(8), dp(14), dp(8))
         edit.addTextChangedListener(object : android.text.TextWatcher {
-            override fun afterTextChanged(s: android.text.Editable?) { clip.text = s?.toString() ?: ""; overlayView.invalidate(); timeline.invalidate() }
+            override fun afterTextChanged(s: android.text.Editable?) { clip.text = s?.toString() ?: ""; changed() }
             override fun beforeTextChanged(s: CharSequence?, st: Int, c1: Int, a: Int) {}
             override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c1: Int) {}
         })
-        val d = sheet(if (fresh) "Add text" else "Edit text", edit,
-            label("Font"),
-            chips(Fx.FONT_NAMES, clip.font) { clip.font = it; overlayView.invalidate() },
-            label("Colour"),
-            colorChips(palette) { clip.color = it; overlayView.invalidate() },
-            slider("Size", 0.02f, 0.2f, clip.sizeFrac, { "%d".format((it * 100).toInt()) }) { clip.sizeFrac = it; overlayView.invalidate() },
-            chips(listOf("Bold", "Regular"), if (clip.bold) 0 else 1) { clip.bold = it == 0; overlayView.invalidate() },
-            label("Drag the text in the preview to place it. Drag its ends on the timeline to set how long it shows."),
-            onClose = {
-                if (clip.text.isBlank()) { project.selectedId = clip.id; project.delete() }
-                afterEdit()
-            })
-        d.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        val tick = ImageView(this)
+        tick.setImageResource(R.drawable.ic_check)
+        tick.setPadding(dp(10), dp(8), dp(10), dp(8))
+        tick.setOnClickListener { dlg?.dismiss() }
+        val top = LinearLayout(this)
+        top.orientation = LinearLayout.HORIZONTAL
+        top.gravity = Gravity.CENTER_VERTICAL
+        top.addView(edit, LinearLayout.LayoutParams(0, dp(44), 1f))
+        top.addView(tick, LinearLayout.LayoutParams(dp(52), dp(44)))
+
+        val content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+        val scroll = ScrollView(this)
+        scroll.addView(content)
+        scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+
+        fun grid(): android.widget.GridLayout = android.widget.GridLayout(this).also { it.columnCount = 4 }
+
+        fun showTab() {
+            content.removeAllViews()
+            when (tab) {
+                0 -> { // templates
+                    val cats = listOf("Trending", "Basic", "Fancy")
+                    val g = grid()
+                    fun fill() {
+                        g.removeAllViews()
+                        val none = TextView(this).apply { text = "Default"; setTextColor(white); textSize = 14f; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD) }
+                        g.addView(gridCell(tileW, none, "", clip.textFx == 0 && clip.strokeColor == 0 && clip.bgColor == 0 && clip.font == 0) {
+                            applyTpl(clip, TextTpl("", "", 0, white, 0, 0.08f, 0, true, 0)); changed(); fill()
+                        })
+                        for (t in textTemplates.filter { it.cat == cats[tplCat] }) {
+                            val probe = Clip(id = -1, kind = LaneKind.TEXT)
+                            applyTpl(probe, t)
+                            val on = clip.font == t.font && clip.color == t.color && clip.textFx == t.fx && clip.strokeColor == t.stroke && clip.bgColor == t.bg
+                            g.addView(gridCell(tileW, pictureCell(styleSample(probe, "Text")), t.name, on) { applyTpl(clip, t); changed(); fill() })
+                        }
+                    }
+                    content.addView(tabBar(cats, tplCat, 15f) { tplCat = it; fill() })
+                    content.addView(g)
+                    fill()
+                }
+                1 -> { // fonts
+                    val g = grid()
+                    fun fill() {
+                        g.removeAllViews()
+                        Fx.FONT_NAMES.forEachIndexed { i, n ->
+                            val probe = clip.deepCopy(-1L); probe.font = i; probe.textFx = 0; probe.strokeColor = 0; probe.bgColor = 0
+                            g.addView(gridCell(tileW, pictureCell(styleSample(probe, "Aa")), n, clip.font == i) { clip.font = i; changed(); fill() })
+                        }
+                    }
+                    content.addView(g)
+                    fill()
+                }
+                2 -> { // styles
+                    val pad = dp(10)
+                    fun row(v: View) { v.setPadding(pad, 0, pad, 0); content.addView(v) }
+                    val bigPalette = palette + listOf(0xFFFF9800.toInt(), 0xFF9C27B0.toInt(), 0xFF00E676.toInt(), 0xFFE91E63.toInt(), 0xFF795548.toInt())
+                    row(label("Colour"))
+                    row(colorChips(bigPalette) { clip.color = it; changed() })
+                    row(label("Stroke"))
+                    val strokeCols = listOf(0, 0xFF000000.toInt(), white, 0xFFD50000.toInt(), 0xFFFFEB3B.toInt(), 0xFF1E5BFF.toInt())
+                    row(chips(listOf("None", "Black", "White", "Red", "Yellow", "Blue"), strokeCols.indexOf(clip.strokeColor)) { clip.strokeColor = strokeCols[it]; changed() })
+                    row(slider("Stroke width", 0.02f, 0.3f, clip.strokeW, { "%d".format((it * 100).toInt()) }) { clip.strokeW = it; changed() })
+                    row(label("Background"))
+                    val bgCols = listOf(0, 0xCC000000.toInt(), white, 0xFFD50000.toInt(), 0xFFFFEB3B.toInt(), 0xFF1E5BFF.toInt())
+                    row(chips(listOf("None", "Black", "White", "Red", "Yellow", "Blue"), bgCols.indexOf(clip.bgColor)) { clip.bgColor = bgCols[it]; changed() })
+                    row(slider("Size", 0.02f, 0.4f, clip.sizeFrac, { "%d".format((it * 100).toInt()) }) { clip.sizeFrac = it; changed() })
+                    row(slider("Tilt", -90f, 90f, clip.tilt.coerceIn(-90f, 90f), { "${it.toInt()}°" }) { clip.tilt = it; changed() })
+                    val tg = LinearLayout(this); tg.orientation = LinearLayout.HORIZONTAL
+                    fun tog(name: String, get: () -> Boolean, set: (Boolean) -> Unit) {
+                        val b = button(name + if (get()) "  ✓" else "") {}
+                        b.setOnClickListener { set(!get()); b.text = name + if (get()) "  ✓" else ""; changed() }
+                        tg.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0, dp(6), dp(6), 0) })
+                    }
+                    tog("Bold", { clip.bold }) { clip.bold = it }
+                    tog("Italic", { clip.italic }) { clip.italic = it }
+                    tog("Shadow", { clip.shadow }) { clip.shadow = it }
+                    row(tg)
+                }
+                3 -> { // effects
+                    val names = listOf("None", "Neon glow", "Long shadow", "Glitch", "Outline", "Gradient")
+                    val g = grid()
+                    fun fill() {
+                        g.removeAllViews()
+                        names.forEachIndexed { i, n ->
+                            val probe = clip.deepCopy(-1L); probe.textFx = i; probe.bgColor = 0
+                            if (i == 1 && probe.color == 0xFFFFFFFF.toInt()) probe.color = 0xFF40C4FF.toInt()
+                            g.addView(gridCell(tileW, pictureCell(styleSample(probe, "Aa")), n, clip.textFx == i) {
+                                clip.textFx = i
+                                if (i == 1 && clip.color == 0xFFFFFFFF.toInt()) clip.color = 0xFF40C4FF.toInt()
+                                changed(); fill()
+                            })
+                        }
+                    }
+                    content.addView(g)
+                    fill()
+                }
+            }
+        }
+
+        val tabs = tabBar(listOf("Templates", "Fonts", "Styles", "Effects", "Animations"), 0, 17f) { i ->
+            if (i == 4) {
+                dlg?.dismiss()
+                ui.postDelayed({ animationsFor(clip) }, 150)
+            } else { tab = i; showTab() }
+        }
+        val line = View(this)
+        line.setBackgroundColor(0xFF2C2C31.toInt())
+        line.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
+        showTab()
+        dlg = sheet("", top, tabs, line, scroll, showHeader = false, heightPx = dockHeight(), onClose = {
+            if (clip.text.isBlank()) { project.selectedId = clip.id; project.delete() }
+            afterEdit()
+        })
+        dlg?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 
+    /** Opens the In / Out / Combo animation panel for a text or sticker clip. */
+    private fun animationsFor(c: Clip) {
+        if (project.byId(c.id) == null) return
+        val side = 240
+        var pic: Bitmap? = null
+        try {
+            val r = OverlayRenderer.render(this, c.deepCopy(-1L).also { it.tilt = 0f }, 480, 480)
+            if (r != null) {
+                val sq = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+                val cv = Canvas(sq)
+                cv.drawColor(0xFF3A3F4B.toInt())
+                val k = min(side * 0.8f / r.width, side * 0.8f / r.height)
+                val w = r.width * k; val h = r.height * k
+                cv.drawBitmap(r, null, RectF((side - w) / 2f, (side - h) / 2f, (side + w) / 2f, (side + h) / 2f), null)
+                pic = sq
+            }
+        } catch (_: Throwable) {}
+        showAnimationPanel(c, pic)
+    }
+
+    // ---------------------------------------------------------------- stickers
+
     private fun stickerDialog() {
-        val emojis = listOf("😀", "😍", "😂", "🔥", "❤️", "👍", "🎉", "⭐", "💯", "😎", "🚀", "🌈", "👑", "🎵", "💥", "✨")
-        sheet("Stickers", chips(emojis, -1) { i ->
-            val c = newFree(LaneKind.TEXT, emojis[i]) ?: return@chips
-            c.sizeFrac = 0.18f
-            c.posY = 0.5f
-            afterEdit()
-        }, label("Tap a sticker to add it at the playhead. Drag it in the preview to move it."))
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        engine.pause()
+        val white = 0xFFFFFFFF.toInt(); val grey = 0xFF8E8E93.toInt()
+        val tileW = (resources.displayMetrics.widthPixels - dp(24)) / 4
+        var dlg: Dialog? = null
+        var cat = 0
+        var query = ""
+        val g = android.widget.GridLayout(this)
+        g.columnCount = 4
+        val scroll = ScrollView(this)
+        scroll.addView(g)
+        scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+
+        fun fill() {
+            g.removeAllViews()
+            val list = if (query.isNotBlank()) StickerArt.ALL.filter { (it.label + " " + it.tags).contains(query.trim(), ignoreCase = true) }
+                       else StickerArt.ALL.filter { it.cat == StickerArt.CATS[cat] }
+            for (s in list) {
+                val bmp = try { StickerArt.render(s, 200) } catch (_: Throwable) { null }
+                g.addView(gridCell(tileW, pictureCell(bmp), "", false) {
+                    val c = newFree(LaneKind.OVERLAY, s.label) ?: return@gridCell
+                    c.uri = "sticker:" + s.id
+                    c.sizeFrac = when (s.kind) { "badge" -> 0.5f; "banner" -> 0.6f; "emoji" -> 0.22f; else -> if (s.glyph == "bar") 0.9f else 0.26f }
+                    c.posX = 0.5f; c.posY = 0.5f
+                    afterEdit()
+                })
+            }
+        }
+
+        val tick = ImageView(this)
+        tick.setImageResource(R.drawable.ic_check)
+        tick.setPadding(dp(10), dp(8), dp(10), dp(8))
+        tick.setOnClickListener { dlg?.dismiss() }
+        val tabs = tabBar(listOf("Stickers", "GIPHY"), 0, 17f) { i ->
+            if (i == 1) toast("GIPHY needs an online service key, so it is not available in this app")
+        }
+        val head = LinearLayout(this)
+        head.orientation = LinearLayout.HORIZONTAL
+        head.gravity = Gravity.CENTER_VERTICAL
+        head.addView(tabs, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        head.addView(tick, LinearLayout.LayoutParams(dp(52), dp(44)))
+
+        val search = EditText(this)
+        search.hint = "Search stickers"
+        search.setHintTextColor(grey); search.setTextColor(white); search.textSize = 15f
+        search.maxLines = 1
+        search.inputType = android.text.InputType.TYPE_CLASS_TEXT
+        val sb = GradientDrawable(); sb.cornerRadius = dp(10).toFloat(); sb.setColor(0xFF2C2C31.toInt())
+        search.background = sb
+        search.setPadding(dp(14), dp(8), dp(14), dp(8))
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(e: android.text.Editable?) { query = e?.toString() ?: ""; fill() }
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
+        })
+        val catBar = tabBar(StickerArt.CATS, 0, 15f) { cat = it; query = ""; search.setText(""); fill() }
+        fill()
+        dlg = sheet("", head, search, catBar, scroll, showHeader = false, heightPx = dockHeight(), onClose = { afterEdit() })
+        dlg?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 
     private var capLang = 0
