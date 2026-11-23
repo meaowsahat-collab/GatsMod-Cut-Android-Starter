@@ -164,7 +164,7 @@ class MainActivity : AppCompatActivity() {
             syncUi()
         }
         timeline.onEdited = { afterEdit() }
-        timeline.onAdd = { k -> if (k == LaneKind.AUDIO) audioPicker.launch(arrayOf("audio/*")) else textDialog() }
+        timeline.onAdd = { k -> when (k) { LaneKind.AUDIO -> audioPicker.launch(arrayOf("audio/*")); LaneKind.OVERLAY -> imagePicker.launch(arrayOf("image/*")); else -> textDialog() } }
         timeline.onSpecial = { name -> soon(name) }
 
         findViewById<View>(R.id.emptyPreview).setOnClickListener { pickVideo() }
@@ -599,7 +599,7 @@ class MainActivity : AppCompatActivity() {
         l.gravity = Gravity.CENTER
         l.isClickable = true
         l.isFocusable = true
-        l.layoutParams = LinearLayout.LayoutParams(if (back) dp(46) else dp(66), ViewGroup.LayoutParams.MATCH_PARENT)
+        l.layoutParams = LinearLayout.LayoutParams(if (back) dp(46) else dp(60), ViewGroup.LayoutParams.MATCH_PARENT)
         l.setOnClickListener { t.act() }
         val iv = ImageView(this)
         iv.setImageResource(t.icon)
@@ -622,11 +622,11 @@ class MainActivity : AppCompatActivity() {
     private fun mainTools(): List<T> = listOf(
         T(R.drawable.ic_cut, "Edit") { val c = need(); if (c != null) syncUi() },
         T(R.drawable.ic_audio, "Audio") { audioPicker.launch(arrayOf("audio/*")) },
-        T(R.drawable.ic_mic, "Voiceover") { startVoiceover() },
         T(R.drawable.ic_text, "Text") { textDialog() },
         T(R.drawable.ic_effects, "Effects") { effectsDialog() },
         T(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
         T(R.drawable.ic_captions, "Captions") { srtPicker.launch(arrayOf("*/*")) },
+        T(R.drawable.ic_mic, "Voiceover") { startVoiceover() },
         T(R.drawable.ic_filters, "Filters") { filtersDialog() },
         T(R.drawable.ic_adjust, "Adjust") { adjustDialog() },
         T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },

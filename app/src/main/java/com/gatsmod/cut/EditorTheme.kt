@@ -69,7 +69,7 @@ object EditorTheme {
         listOf(R.id.topBar, R.id.controls, R.id.timelineBlock, R.id.toolbarScroll).forEach {
             a.findViewById<View>(it)?.setBackgroundColor(t.panel)
         }
-        a.findViewById<TimelineView>(R.id.timeline)?.let { it.setBgColor(t.timeline) }
+        a.findViewById<TimelineView>(R.id.timeline)?.let { it.setBgColor(t.panel) }
         a.window.statusBarColor = t.panel
         a.window.navigationBarColor = t.panel
     }

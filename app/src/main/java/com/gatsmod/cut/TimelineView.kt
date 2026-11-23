@@ -125,7 +125,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
         add(LaneKind.VIDEO, mainH, true)
         add(LaneKind.AUDIO, smallH, hasMain)
         add(LaneKind.TEXT, smallH, hasMain)
-        add(LaneKind.OVERLAY, smallH, false)
+        add(LaneKind.OVERLAY, smallH, hasMain)
         return out
     }
 
@@ -166,7 +166,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
         canvas.drawCircle(cx, rulerH - dp(2f), dp(4f), white)
     }
 
-    private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2A2A2E.toInt() }
+    private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x26FFFFFF }
     private val boxText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE6E6EA.toInt(); textSize = dp(11f); textAlign = Paint.Align.CENTER }
     private val addText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF9A9AA2.toInt(); textSize = dp(13f) }
     private val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF7A1A.toInt() }
@@ -178,7 +178,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
 
     private fun drawPlaceholder(canvas: Canvas, row: Row) {
         val r = barRect(row)
-        fill.color = 0xFF1B1B1F.toInt()
+        fill.color = 0x1FFFFFFF
         canvas.drawRoundRect(r, dp(7f), dp(7f), fill)
         val s = if (row.kind == LaneKind.AUDIO) "+  Add audio" else "+  Add text"
         canvas.drawText(s, r.left + dp(12f), r.centerY() + dp(4.5f), addText)
@@ -220,6 +220,17 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
                     if (ib.right > -dp(10f)) {
                         canvas.drawRoundRect(ib, dp(7f), dp(7f), boxPaint)
                         canvas.drawText(if (row.kind == LaneKind.AUDIO) "♪" else "T", ib.centerX(), ib.centerY() + dp(5f), boxText)
+                    }
+                }
+                LaneKind.OVERLAY -> if (p.overlay.isEmpty()) {
+                    val ib = iconBox(row)
+                    if (ib.right > -dp(10f)) {
+                        canvas.drawRoundRect(ib, dp(7f), dp(7f), boxPaint)
+                        val r = RectF(ib.centerX() - dp(7f), ib.centerY() - dp(6f), ib.centerX() + dp(3f), ib.centerY() + dp(4f))
+                        val r2 = RectF(ib.centerX() - dp(3f), ib.centerY() - dp(2f), ib.centerX() + dp(7f), ib.centerY() + dp(8f))
+                        val st = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = boxText.color; style = Paint.Style.STROKE; strokeWidth = dp(1.4f) }
+                        canvas.drawRoundRect(r, dp(2f), dp(2f), st)
+                        canvas.drawRoundRect(r2, dp(2f), dp(2f), st)
                     }
                 }
                 else -> {}
@@ -420,6 +431,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
                     LaneKind.AUDIO, LaneKind.TEXT -> if (p.lane(row.kind).isEmpty() && (iconBox(row).contains(x, y) || barRect(row).contains(x, y))) {
                         onAdd?.invoke(row.kind); return
                     }
+                    LaneKind.OVERLAY -> if (p.overlay.isEmpty() && iconBox(row).contains(x, y)) { onAdd?.invoke(row.kind); return }
                     else -> {}
                 }
             }
