@@ -19,15 +19,15 @@ class AnimDef(val id: Int, val name: String, val glyph: String, val cats: String
 
 /** In / Out / Combo animations like CapCut's panel. Everything is a plain function of time, so preview and export match. */
 object Anim {
-    val CATS = listOf("Trending", "Basic", "Light", "Glitch", "Mask", "3D", "Vibrate")
+    val CATS = listOf("Trending", "Basic", "Light", "Glitch", "Mask", "3D", "Vibration", "Zoom", "Slide", "Blur")
 
     val IN = listOf(
-        AnimDef(1, "Zoom In", "⤢", "Trending,Basic"), AnimDef(2, "Pop", "✦", "Trending,Basic"),
+        AnimDef(1, "Zoom In", "⤢", "Trending,Basic,Zoom"), AnimDef(2, "Pop", "✦", "Trending,Basic"),
         AnimDef(3, "Bounce In", "◉", "Trending,Basic"), AnimDef(4, "Spin In", "↻", "Trending,Basic"),
-        AnimDef(5, "Flash In", "☀", "Trending,Light"), AnimDef(6, "Fade In", "◐", "Basic,Light"),
+        AnimDef(5, "Flash In", "☀", "Trending,Light"), AnimDef(6, "Fade In", "◐", "Basic,Light,Blur"),
         AnimDef(7, "Slide Left", "⇦", "Basic"), AnimDef(8, "Slide Right", "⇨", "Basic"),
         AnimDef(9, "Slide Up", "⇧", "Basic"), AnimDef(10, "Slide Down", "⇩", "Basic"),
-        AnimDef(11, "Shrink In", "⤡", "Basic"), AnimDef(12, "Blink In", "◌", "Light"),
+        AnimDef(11, "Shrink In", "⤡", "Basic,Zoom"), AnimDef(12, "Blink In", "◌", "Light,Blur"),
         AnimDef(13, "Burn In", "✺", "Trending,Light"), AnimDef(14, "Glitch In", "▚", "Trending,Glitch"),
         AnimDef(16, "Stutter In", "▤", "Glitch"), AnimDef(22, "Jitter In", "▦", "Glitch"),
         AnimDef(17, "Flip X", "⇋", "3D"), AnimDef(18, "Flip Y", "⇅", "3D"),
@@ -39,12 +39,12 @@ object Anim {
     // Out animations replay an In animation backwards; [src] is the In id used.
     class OutDef(val def: AnimDef, val src: Int)
     val OUT = listOf(
-        OutDef(AnimDef(1001, "Zoom Out", "⤡", "Trending,Basic"), 1), OutDef(AnimDef(1002, "Pop Out", "✦", "Trending,Basic"), 2),
+        OutDef(AnimDef(1001, "Zoom Out", "⤡", "Trending,Basic,Zoom"), 1), OutDef(AnimDef(1002, "Pop Out", "✦", "Trending,Basic"), 2),
         OutDef(AnimDef(1003, "Bounce Out", "◉", "Trending,Basic"), 3), OutDef(AnimDef(1004, "Spin Out", "↺", "Trending,Basic"), 4),
-        OutDef(AnimDef(1005, "Flash Out", "☀", "Trending,Light"), 5), OutDef(AnimDef(1006, "Fade Out", "◐", "Basic,Light"), 6),
+        OutDef(AnimDef(1005, "Flash Out", "☀", "Trending,Light"), 5), OutDef(AnimDef(1006, "Fade Out", "◐", "Basic,Light,Blur"), 6),
         OutDef(AnimDef(1007, "Slide Left", "⇦", "Basic"), 8), OutDef(AnimDef(1008, "Slide Right", "⇨", "Basic"), 7),
         OutDef(AnimDef(1009, "Slide Up", "⇧", "Basic"), 10), OutDef(AnimDef(1010, "Slide Down", "⇩", "Basic"), 9),
-        OutDef(AnimDef(1011, "Grow Out", "⤢", "Basic"), 11), OutDef(AnimDef(1012, "Blink Out", "◌", "Light"), 12),
+        OutDef(AnimDef(1011, "Grow Out", "⤢", "Basic,Zoom"), 11), OutDef(AnimDef(1012, "Blink Out", "◌", "Light,Blur"), 12),
         OutDef(AnimDef(1013, "Burn Out", "✺", "Trending,Light"), 13), OutDef(AnimDef(1014, "Glitch Out", "▚", "Trending,Glitch"), 14),
         OutDef(AnimDef(1016, "Stutter Out", "▤", "Glitch"), 16), OutDef(AnimDef(1022, "Jitter Out", "▦", "Glitch"), 22),
         OutDef(AnimDef(1017, "Flip X Out", "⇋", "3D"), 17), OutDef(AnimDef(1018, "Flip Y Out", "⇅", "3D"), 18),
@@ -56,8 +56,8 @@ object Anim {
 
     val COMBO = listOf(
         AnimDef(101, "Pulse", "◎", "Trending,Basic"), AnimDef(102, "Heartbeat", "♥", "Trending,Basic"),
-        AnimDef(107, "Zoom Drift", "⤢", "Trending,Basic"), AnimDef(108, "Breathe", "◍", "Basic,Light"),
-        AnimDef(113, "Pan Right", "⇨", "Basic"), AnimDef(114, "Pan Left", "⇦", "Basic"), AnimDef(105, "Float", "☁", "Basic"),
+        AnimDef(107, "Zoom Drift", "⤢", "Trending,Basic,Zoom"), AnimDef(108, "Breathe", "◍", "Basic,Light,Zoom"),
+        AnimDef(113, "Pan Right", "⇨", "Basic,Slide"), AnimDef(114, "Pan Left", "⇦", "Basic,Slide"), AnimDef(105, "Float", "☁", "Basic,Blur"),
         AnimDef(111, "Strobe", "☀", "Light"), AnimDef(112, "Glitch Loop", "▚", "Trending,Glitch"),
         AnimDef(110, "Wobble", "≀", "3D"), AnimDef(109, "Spin Loop", "↻", "3D"), AnimDef(115, "Pendulum", "⌒", "3D"), AnimDef(103, "Swing", "⌓", "3D"),
         AnimDef(106, "Shake", "≋", "Trending,Vibrate"), AnimDef(104, "Rock", "∿", "Vibrate")
