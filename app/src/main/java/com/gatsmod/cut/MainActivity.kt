@@ -1890,9 +1890,9 @@ class MainActivity : AppCompatActivity() {
 
         fun items(): List<Pair<Int, AnimDef>> {
             val src: List<Pair<Int, AnimDef>> = when (tab) {
-                0 -> Anim.IN.map { it.id to it }
-                1 -> Anim.OUT.map { it.def.id to it.def }
-                else -> Anim.COMBO.map { it.id to it }
+                0 -> (Anim.IN + Anim.EXTRA_IN).map { it.id to it }
+                1 -> (Anim.OUT + Anim.EXTRA_OUT).map { it.def.id to it.def }
+                else -> (Anim.COMBO + Anim.EXTRA_COMBO).map { it.id to it }
             }
             if (query.isNotBlank()) return src.filter { it.second.name.contains(query.trim(), ignoreCase = true) && (c.kind == LaneKind.VIDEO || !Anim.isMask(it.first)) }
             val key = Anim.CATS[cat]
