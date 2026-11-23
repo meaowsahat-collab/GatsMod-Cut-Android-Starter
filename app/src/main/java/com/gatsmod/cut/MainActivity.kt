@@ -2458,7 +2458,7 @@ class MainActivity : AppCompatActivity() {
                     val items = try { Giphy.load(key, q) } catch (e: Throwable) { null }
                     runOnUiThread {
                         if (items == null) {
-                            if (Giphy.ownKey(this).isBlank()) giphyBody("GIPHY did not answer with its shared test key (no internet, or GIPHY limited / switched it off).")
+                            if (Giphy.ownKey(this).isBlank()) giphyBody("GIPHY did not answer (no internet, or the hourly limit of the app key was reached).")
                             else status.text = "Could not load GIPHY. Check the internet and your key."
                             return@runOnUiThread
                         }

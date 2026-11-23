@@ -13,8 +13,8 @@ object Giphy {
     class Item(val id: String, val thumbUrl: String, val gifUrl: String, val title: String)
 
     private const val PREFS = "gatsmod"
-    /** GIPHY's public test key, used until the user saves their own. It can be rate-limited or switched off by GIPHY. */
-    private const val PUBLIC_TEST_KEY = "dc6zaTOxFJmzC"
+    /** The app's GIPHY API key (GIPHY keys are meant to live inside apps). A user can still save their own. */
+    private const val PUBLIC_TEST_KEY = "QhsGeW2uTfWqxLrLce3YI7iJI23vXNHV"
     fun ownKey(ctx: Context): String = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("giphy_key", "") ?: ""
     fun key(ctx: Context): String = ownKey(ctx).ifBlank { PUBLIC_TEST_KEY }
     fun setKey(ctx: Context, k: String) { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("giphy_key", k.trim()).apply() }
