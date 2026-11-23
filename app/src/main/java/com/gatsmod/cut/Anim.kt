@@ -36,6 +36,109 @@ object Anim {
         AnimDef(24, "Circle Reveal", "●", "Trending,Mask"), AnimDef(25, "Square Reveal", "■", "Mask"), AnimDef(26, "Diamond Reveal", "◆", "Mask")
     )
 
+    val EXTRA_IN = listOf(
+        AnimDef(200, "Windshield Sweep", "✦", "Trending"),
+        AnimDef(201, "Paging Down", "⤢", "Trending"),
+        AnimDef(202, "Cartoon Fire Blast", "◉", "Trending"),
+        AnimDef(203, "New Year Spark", "↻", "Trending"),
+        AnimDef(204, "Pyro Blast", "☀", "Trending"),
+        AnimDef(205, "Astral Flip-In", "◐", "Trending"),
+        AnimDef(206, "Disorientation", "⇦", "Trending"),
+        AnimDef(207, "Mid-Part Pop", "⇨", "Trending"),
+        AnimDef(208, "Cursed Smoke", "⇧", "Trending"),
+        AnimDef(209, "Forest Escape", "⇩", "Trending"),
+        AnimDef(210, "Fade Rise", "⤡", "Basic"),
+        AnimDef(211, "Gentle Float", "◌", "Basic"),
+        AnimDef(212, "Soft Tilt", "✺", "Basic"),
+        AnimDef(213, "Clean Drop", "▚", "Basic"),
+        AnimDef(214, "Steady Shift", "≋", "Basic"),
+        AnimDef(215, "Ease Scale", "▤", "Basic"),
+        AnimDef(216, "Smooth Glide", "▦", "Basic"),
+        AnimDef(217, "Calm Drift", "⇋", "Basic"),
+        AnimDef(218, "Light Pop", "⇅", "Basic"),
+        AnimDef(219, "Swing Exit", "⌒", "Basic"),
+        AnimDef(220, "Solar Flare", "◢", "Light"),
+        AnimDef(221, "Neon Pulse", "∿", "Light"),
+        AnimDef(222, "Prism Glow", "≈", "Light"),
+        AnimDef(223, "Flash Beam", "●", "Light"),
+        AnimDef(224, "Golden Ray", "■", "Light"),
+        AnimDef(225, "Aurora Wave", "◆", "Light"),
+        AnimDef(226, "Spark Burst", "✦", "Light"),
+        AnimDef(227, "Halo Expand", "⤢", "Light"),
+        AnimDef(228, "Laser Sweep", "◉", "Light"),
+        AnimDef(229, "Twilight Fade", "↻", "Light"),
+        AnimDef(230, "Scanline Tear", "☀", "Glitch"),
+        AnimDef(231, "RGB Split", "◐", "Glitch"),
+        AnimDef(232, "Signal Drop", "⇦", "Glitch"),
+        AnimDef(233, "Pixel Warp", "⇨", "Glitch"),
+        AnimDef(234, "Static Flash", "⇧", "Glitch"),
+        AnimDef(235, "Channel Shift", "⇩", "Glitch"),
+        AnimDef(236, "Frame Jitter", "⤡", "Glitch"),
+        AnimDef(237, "Cyber Skew", "◌", "Glitch"),
+        AnimDef(238, "Data Slice", "✺", "Glitch"),
+        AnimDef(239, "Corrupt Pulse", "▚", "Glitch"),
+        AnimDef(240, "Center Reveal", "≋", "Mask"),
+        AnimDef(241, "Blind Curtain", "▤", "Mask"),
+        AnimDef(242, "Iris Open", "▦", "Mask"),
+        AnimDef(243, "Shutter Wipe", "⇋", "Mask"),
+        AnimDef(244, "Ribbon Unfold", "⇅", "Mask"),
+        AnimDef(245, "Strip Sweep", "⌒", "Mask"),
+        AnimDef(246, "Split Frame", "◢", "Mask"),
+        AnimDef(247, "Curtain Drop", "∿", "Mask"),
+        AnimDef(248, "Edge Peel", "≈", "Mask"),
+        AnimDef(249, "Frame Expand", "●", "Mask"),
+        AnimDef(250, "Orbit Flip", "■", "3D"),
+        AnimDef(251, "Perspective Twist", "◆", "3D"),
+        AnimDef(252, "Depth Dive", "✦", "3D"),
+        AnimDef(253, "Card Turn", "⤢", "3D"),
+        AnimDef(254, "3D Roll", "◉", "3D"),
+        AnimDef(255, "Tunnel Pull", "↻", "3D"),
+        AnimDef(256, "Cube Pivot", "☀", "3D"),
+        AnimDef(257, "Skew Spin", "◐", "3D"),
+        AnimDef(258, "Camera Tilt", "⇦", "3D"),
+        AnimDef(259, "3D Swing", "⇨", "3D"),
+        AnimDef(260, "Bass Shake", "⇧", "Vibration"),
+        AnimDef(261, "Tremor Hit", "⇩", "Vibration"),
+        AnimDef(262, "Quake Pulse", "⤡", "Vibration"),
+        AnimDef(263, "Rumble Beat", "◌", "Vibration"),
+        AnimDef(264, "Shock Jolt", "✺", "Vibration"),
+        AnimDef(265, "Impact Buzz", "▚", "Vibration"),
+        AnimDef(266, "Wobble Ring", "≋", "Vibration"),
+        AnimDef(267, "Beat Bounce", "▤", "Vibration"),
+        AnimDef(268, "Micro Quake", "▦", "Vibration"),
+        AnimDef(269, "Turbo Shake", "⇋", "Vibration"),
+        AnimDef(270, "Punch Zoom", "⇅", "Zoom"),
+        AnimDef(271, "Slow Push", "⌒", "Zoom"),
+        AnimDef(272, "Snap In", "◢", "Zoom"),
+        AnimDef(273, "Breath Zoom", "∿", "Zoom"),
+        AnimDef(274, "Macro Pull", "≈", "Zoom"),
+        AnimDef(275, "Quick Zoom", "●", "Zoom"),
+        AnimDef(276, "Lens Surge", "■", "Zoom"),
+        AnimDef(277, "Deep Zoom", "◆", "Zoom"),
+        AnimDef(278, "Zoom Bounce", "✦", "Zoom"),
+        AnimDef(279, "Wide Pull", "⤢", "Zoom"),
+        AnimDef(280, "Slide Right", "◉", "Slide"),
+        AnimDef(281, "Slide Down", "↻", "Slide"),
+        AnimDef(282, "Swift Glide", "☀", "Slide"),
+        AnimDef(283, "Sweep Across", "◐", "Slide"),
+        AnimDef(284, "Step Slide", "⇦", "Slide"),
+        AnimDef(285, "Cascade Drop", "⇨", "Slide"),
+        AnimDef(286, "Track Shift", "⇧", "Slide"),
+        AnimDef(287, "Side Roll", "⇩", "Slide"),
+        AnimDef(288, "Fast Slide", "⤡", "Slide"),
+        AnimDef(289, "Glide Exit", "◌", "Slide"),
+        AnimDef(290, "Focus Pull", "✺", "Blur"),
+        AnimDef(291, "Soft Defocus", "▚", "Blur"),
+        AnimDef(292, "Motion Blur", "≋", "Blur"),
+        AnimDef(293, "Dream Haze", "▤", "Blur"),
+        AnimDef(294, "Lens Blur In", "▦", "Blur"),
+        AnimDef(295, "Mist Focus", "⇋", "Blur"),
+        AnimDef(296, "Blur Zoom", "⇅", "Blur"),
+        AnimDef(297, "Hazy Drift", "⌒", "Blur"),
+        AnimDef(298, "Sharp Snap", "◢", "Blur"),
+        AnimDef(299, "Soft Fade", "∿", "Blur")
+    )
+
     // Out animations replay an In animation backwards; [src] is the In id used.
     class OutDef(val def: AnimDef, val src: Int)
     val OUT = listOf(
@@ -54,6 +157,8 @@ object Anim {
         OutDef(AnimDef(1024, "Circle Close", "●", "Trending,Mask"), 24), OutDef(AnimDef(1025, "Square Close", "■", "Mask"), 25), OutDef(AnimDef(1026, "Diamond Close", "◆", "Mask"), 26)
     )
 
+    val EXTRA_OUT = EXTRA_IN.mapIndexed { i, d -> OutDef(AnimDef(1200+i, d.name + " Out", d.glyph, d.cats), d.id) }
+
     val COMBO = listOf(
         AnimDef(101, "Pulse", "◎", "Trending,Basic"), AnimDef(102, "Heartbeat", "♥", "Trending,Basic"),
         AnimDef(107, "Zoom Drift", "⤢", "Trending,Basic,Zoom"), AnimDef(108, "Breathe", "◍", "Basic,Light,Zoom"),
@@ -63,12 +168,119 @@ object Anim {
         AnimDef(106, "Shake", "≋", "Trending,Vibration"), AnimDef(104, "Rock", "∿", "Vibration")
     )
 
+    val EXTRA_COMBO = listOf(
+        AnimDef(2200, "Windshield Sweep Loop", "⤡", "Trending"),
+        AnimDef(2201, "Paging Down Loop", "◌", "Trending"),
+        AnimDef(2202, "Cartoon Fire Blast Loop", "✺", "Trending"),
+        AnimDef(2203, "New Year Spark Loop", "▚", "Trending"),
+        AnimDef(2204, "Cartoon Fire Blast Loop", "≋", "Trending"),
+        AnimDef(2205, "Astral Flip-In Loop", "▤", "Trending"),
+        AnimDef(2206, "Windshield Sweep Loop", "▦", "Trending"),
+        AnimDef(2207, "New Year Spark Loop", "⇋", "Trending"),
+        AnimDef(2208, "Cursed Smoke Loop", "⇅", "Trending"),
+        AnimDef(2209, "Forest Escape Loop", "⌒", "Trending"),
+        AnimDef(2210, "Fade Rise Loop", "◢", "Basic"),
+        AnimDef(2211, "Gentle Float Loop", "∿", "Basic"),
+        AnimDef(2212, "Windshield Sweep Loop", "≈", "Basic"),
+        AnimDef(2213, "Paging Down Loop", "●", "Basic"),
+        AnimDef(2214, "Steady Shift Loop", "■", "Basic"),
+        AnimDef(2215, "Forest Escape Loop", "◆", "Basic"),
+        AnimDef(2216, "Smooth Glide Loop", "✦", "Basic"),
+        AnimDef(2217, "Windshield Sweep Loop", "⤢", "Basic"),
+        AnimDef(2218, "New Year Spark Loop", "◉", "Basic"),
+        AnimDef(2219, "Swing Exit Loop", "↻", "Basic"),
+        AnimDef(2220, "Solar Flare Loop", "☀", "Light"),
+        AnimDef(2221, "Gentle Float Loop", "◐", "Light"),
+        AnimDef(2222, "Cursed Smoke Loop", "⇦", "Light"),
+        AnimDef(2223, "Solar Flare Loop", "⇨", "Light"),
+        AnimDef(2224, "New Year Spark Loop", "⇧", "Light"),
+        AnimDef(2225, "Cursed Smoke Loop", "⇩", "Light"),
+        AnimDef(2226, "Solar Flare Loop", "⤡", "Light"),
+        AnimDef(2227, "New Year Spark Loop", "◌", "Light"),
+        AnimDef(2228, "Windshield Sweep Loop", "✺", "Light"),
+        AnimDef(2229, "Fade Rise Loop", "▚", "Light"),
+        AnimDef(2230, "Cursed Smoke Loop", "≋", "Glitch"),
+        AnimDef(2231, "Cursed Smoke Loop", "▤", "Glitch"),
+        AnimDef(2232, "Paging Down Loop", "▦", "Glitch"),
+        AnimDef(2233, "Windshield Sweep Loop", "⇋", "Glitch"),
+        AnimDef(2234, "Static Flash Loop", "⇅", "Glitch"),
+        AnimDef(2235, "Cursed Smoke Loop", "⌒", "Glitch"),
+        AnimDef(2236, "Frame Jitter Loop", "◢", "Glitch"),
+        AnimDef(2237, "Windshield Sweep Loop", "∿", "Glitch"),
+        AnimDef(2238, "Paging Down Loop", "≈", "Glitch"),
+        AnimDef(2239, "Cursed Smoke Loop", "●", "Glitch"),
+        AnimDef(2240, "Center Reveal Loop", "■", "Mask"),
+        AnimDef(2241, "Blind Curtain Loop", "◆", "Mask"),
+        AnimDef(2242, "Iris Open Loop", "✦", "Mask"),
+        AnimDef(2243, "Paging Down Loop", "⤢", "Mask"),
+        AnimDef(2244, "Center Reveal Loop", "◉", "Mask"),
+        AnimDef(2245, "Blind Curtain Loop", "↻", "Mask"),
+        AnimDef(2246, "Iris Open Loop", "☀", "Mask"),
+        AnimDef(2247, "Blind Curtain Loop", "◐", "Mask"),
+        AnimDef(2248, "Center Reveal Loop", "⇦", "Mask"),
+        AnimDef(2249, "Iris Open Loop", "⇨", "Mask"),
+        AnimDef(2250, "Astral Flip-In Loop", "⇧", "3D"),
+        AnimDef(2251, "Windshield Sweep Loop", "⇩", "3D"),
+        AnimDef(2252, "Forest Escape Loop", "⤡", "3D"),
+        AnimDef(2253, "Astral Flip-In Loop", "◌", "3D"),
+        AnimDef(2254, "3D Roll Loop", "✺", "3D"),
+        AnimDef(2255, "Forest Escape Loop", "▚", "3D"),
+        AnimDef(2256, "Cube Pivot Loop", "≋", "3D"),
+        AnimDef(2257, "Windshield Sweep Loop", "▤", "3D"),
+        AnimDef(2258, "Windshield Sweep Loop", "▦", "3D"),
+        AnimDef(2259, "Swing Exit Loop", "⇋", "3D"),
+        AnimDef(2260, "Static Flash Loop", "⇅", "Vibration"),
+        AnimDef(2261, "Tremor Hit Loop", "⌒", "Vibration"),
+        AnimDef(2262, "Quake Pulse Loop", "◢", "Vibration"),
+        AnimDef(2263, "Rumble Beat Loop", "∿", "Vibration"),
+        AnimDef(2264, "Static Flash Loop", "≈", "Vibration"),
+        AnimDef(2265, "Tremor Hit Loop", "●", "Vibration"),
+        AnimDef(2266, "Windshield Sweep Loop", "■", "Vibration"),
+        AnimDef(2267, "Beat Bounce Loop", "◆", "Vibration"),
+        AnimDef(2268, "Quake Pulse Loop", "✦", "Vibration"),
+        AnimDef(2269, "Static Flash Loop", "⤢", "Vibration"),
+        AnimDef(2270, "Forest Escape Loop", "◉", "Zoom"),
+        AnimDef(2271, "Slow Push Loop", "↻", "Zoom"),
+        AnimDef(2272, "New Year Spark Loop", "☀", "Zoom"),
+        AnimDef(2273, "Gentle Float Loop", "◐", "Zoom"),
+        AnimDef(2274, "Forest Escape Loop", "⇦", "Zoom"),
+        AnimDef(2275, "New Year Spark Loop", "⇨", "Zoom"),
+        AnimDef(2276, "Gentle Float Loop", "⇧", "Zoom"),
+        AnimDef(2277, "Forest Escape Loop", "⇩", "Zoom"),
+        AnimDef(2278, "Beat Bounce Loop", "⤡", "Zoom"),
+        AnimDef(2279, "Slow Push Loop", "◌", "Zoom"),
+        AnimDef(2280, "Smooth Glide Loop", "✺", "Slide"),
+        AnimDef(2281, "Paging Down Loop", "▚", "Slide"),
+        AnimDef(2282, "Smooth Glide Loop", "≋", "Slide"),
+        AnimDef(2283, "Windshield Sweep Loop", "▤", "Slide"),
+        AnimDef(2284, "Steady Shift Loop", "▦", "Slide"),
+        AnimDef(2285, "Paging Down Loop", "⇋", "Slide"),
+        AnimDef(2286, "Smooth Glide Loop", "⇅", "Slide"),
+        AnimDef(2287, "Steady Shift Loop", "⌒", "Slide"),
+        AnimDef(2288, "Smooth Glide Loop", "◢", "Slide"),
+        AnimDef(2289, "Swing Exit Loop", "∿", "Slide"),
+        AnimDef(2290, "Fade Rise Loop", "≈", "Blur"),
+        AnimDef(2291, "Fade Rise Loop", "●", "Blur"),
+        AnimDef(2292, "Steady Shift Loop", "■", "Blur"),
+        AnimDef(2293, "Cursed Smoke Loop", "◆", "Blur"),
+        AnimDef(2294, "Fade Rise Loop", "✦", "Blur"),
+        AnimDef(2295, "Fade Rise Loop", "⤢", "Blur"),
+        AnimDef(2296, "Forest Escape Loop", "◉", "Blur"),
+        AnimDef(2297, "Cursed Smoke Loop", "↻", "Blur"),
+        AnimDef(2298, "New Year Spark Loop", "☀", "Blur"),
+        AnimDef(2299, "Fade Rise Loop", "◐", "Blur")
+    )
+
     private fun easeOut(p: Float): Float { val q = 1f - p; return 1f - q * q * q }
     private fun back(p: Float): Float { val q = p - 1f; return 1f + 2.70158f * q * q * q + 1.70158f * q * q }
     private fun hash(n: Int): Float { var h = n * 374761393 + 668265263; h = (h xor (h ushr 13)) * 1274126177; return ((h xor (h ushr 16)) and 0xFFFF) / 65535f }
 
     /** Pose of In animation [id] at progress [p] (0 = just started, 1 = finished and at rest). */
+    private val EXTRA_BASES = listOf(20, 10, 13, 2, 13, 17, 20, 2, 14, 1, 6, 108, 20, 10, 7, 1, 8, 20, 2, 19, 5, 108, 14, 5, 2, 14, 5, 2, 20, 6, 14, 14, 10, 20, 15, 14, 22, 20, 10, 14, 24, 25, 26, 10, 24, 25, 26, 25, 24, 26, 17, 20, 1, 17, 4, 1, 18, 20, 20, 19, 15, 21, 23, 106, 15, 21, 20, 3, 23, 15, 1, 107, 2, 108, 1, 2, 108, 1, 3, 107, 8, 10, 8, 20, 7, 10, 8, 7, 8, 19, 6, 6, 7, 14, 6, 6, 1, 14, 2, 6)
+    fun extraBase(id: Int) = EXTRA_BASES.getOrNull(id - 200) ?: 0
+
     fun inPose(id: Int, p0: Float): Pose {
+        if (id in 200..299) return inPose(extraBase(id), p0)
         val p = p0.coerceIn(0f, 1f)
         val e = easeOut(p)
         val r = 1f - p
@@ -102,7 +314,11 @@ object Anim {
     }
 
     /** Pose of a looping Combo animation [id] at [tMs] into a clip that lasts [lenMs]. */
+    private val EXTRA_COMBO_BASES = listOf(110, 113, 111, 108, 111, 109, 110, 108, 112, 107, 108, 108, 110, 113, 113, 107, 113, 110, 108, 103, 108, 108, 112, 108, 108, 112, 108, 108, 110, 108, 112, 112, 113, 110, 106, 112, 108, 110, 113, 112, 108, 108, 108, 113, 108, 108, 108, 108, 108, 108, 109, 110, 107, 109, 108, 107, 110, 110, 110, 103, 106, 108, 108, 108, 106, 108, 110, 108, 108, 106, 107, 108, 108, 108, 107, 108, 108, 107, 108, 108, 113, 113, 113, 110, 113, 113, 113, 113, 113, 103, 108, 108, 113, 112, 108, 108, 107, 112, 108, 108)
+    fun extraComboBase(id: Int) = EXTRA_COMBO_BASES.getOrNull(id - 2200) ?: 0
+
     fun comboPose(id: Int, tMs: Long, lenMs: Long): Pose {
+        if (id in 2200..2299) return comboPose(extraComboBase(id), tMs, lenMs)
         val t = tMs.toFloat()
         val tau = (2.0 * PI).toFloat()
         fun w(period: Float) = tau * t / period
@@ -129,7 +345,7 @@ object Anim {
         }
     }
 
-    fun isMask(id: Int) = id in 24..26 || id in 1024..1026
+    fun isMask(id: Int) = id in 24..26 || id in 1024..1026 || (id in 200..299 && extraBase(id) in 24..26)
 
     private fun durs(animIn: Int, inMs: Long, animOut: Int, outMs: Long, lenMs: Long): LongArray {
         var a = if (animIn != 0) inMs else 0L
@@ -151,7 +367,7 @@ object Anim {
         return floatArrayOf(shape.toFloat(), max(0.02f, easeOut(p.coerceIn(0f, 1f)) * big))
     }
 
-    fun outSrc(id: Int): Int = OUT.firstOrNull { it.def.id == id }?.src ?: 0
+    fun outSrc(id: Int): Int = OUT.firstOrNull { it.def.id == id }?.src ?: EXTRA_OUT.firstOrNull { it.def.id == id }?.src ?: 0
 
     /**
      * The combined pose at [tMs] (ms since the clip start on the timeline) for a clip [lenMs] long.
