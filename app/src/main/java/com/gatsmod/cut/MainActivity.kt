@@ -2251,7 +2251,61 @@ class MainActivity : AppCompatActivity() {
         TextTpl("Retro", "Fancy", 5, 0xFFFFC107.toInt(), 0xFF6A1B9A.toInt(), 0.12f, 0, false, 0),
         TextTpl("Mint", "Fancy", 6, 0xFF69F0AE.toInt(), 0xFF004D40.toInt(), 0.1f, 0, false, 0),
         TextTpl("Comic", "Fancy", 5, 0xFFFFEB3B.toInt(), 0xFF000000.toInt(), 0.15f, 0, false, 0)
-    )
+    ) + generatedTextTemplates()
+
+    /** Builds the rest of the 150 templates from colour / font / effect combinations. */
+    private fun generatedTextTemplates(): List<TextTpl> {
+        val pal = listOf(
+            "Red" to 0xFFFF1744.toInt(), "Orange" to 0xFFFF9100.toInt(), "Yellow" to 0xFFFFEA00.toInt(), "Lime" to 0xFFC6FF00.toInt(),
+            "Green" to 0xFF00E676.toInt(), "Mint" to 0xFF1DE9B6.toInt(), "Cyan" to 0xFF00E5FF.toInt(), "Sky" to 0xFF40C4FF.toInt(),
+            "Blue" to 0xFF2979FF.toInt(), "Violet" to 0xFF7C4DFF.toInt(), "Purple" to 0xFFD500F9.toInt(), "Pink" to 0xFFFF4081.toInt(),
+            "Rose" to 0xFFFF80AB.toInt(), "Gold" to 0xFFFFC107.toInt(), "Coral" to 0xFFFF6E40.toInt(), "White" to 0xFFFFFFFF.toInt(),
+            "Black" to 0xFF111111.toInt(), "Silver" to 0xFFCFD8DC.toInt(), "Teal" to 0xFF00BFA5.toInt(), "Peach" to 0xFFFFAB91.toInt(),
+            "Navy" to 0xFF1A237E.toInt(), "Maroon" to 0xFF880E4F.toInt(), "Olive" to 0xFF9E9D24.toInt(), "Sand" to 0xFFFFE0B2.toInt(),
+            "Ice" to 0xFFB3E5FC.toInt()
+        )
+        val out = ArrayList<TextTpl>()
+        // Neon: 25 glowing colours
+        pal.forEach { (n, c) -> out.add(TextTpl("Neon $n", "Neon", 6, c, 0, 0.08f, 0, false, 1)) }
+        // Trending: 22 pop combos (fill + outline)
+        val strokes = listOf(0xFF000000.toInt(), 0xFFD50000.toInt(), 0xFF1A237E.toInt(), 0xFF4A148C.toInt(), 0xFF004D40.toInt(), 0xFFFFFFFF.toInt())
+        for (i in 0 until 22) {
+            val (n, c) = pal[i]
+            val st = strokes[i % strokes.size].let { if (it == c) 0xFF000000.toInt() else it }
+            out.add(TextTpl("Pop $n", "Trending", if (i % 3 == 0) 5 else 6, c, st, 0.1f + (i % 3) * 0.02f, 0, false, 0))
+        }
+        // Basic: 19 label boxes
+        val boxes = listOf(0xFFFFFFFF.toInt(), 0xCC000000.toInt(), 0xFFFFEA00.toInt(), 0xFFFF1744.toInt(), 0xFF2979FF.toInt(), 0xFF00C853.toInt(), 0xFF7C4DFF.toInt(), 0xFFFF4081.toInt(), 0xFFFF9100.toInt(), 0xFF263238.toInt())
+        val dark = setOf(0xFFFFFFFF.toInt(), 0xFFFFEA00.toInt(), 0xFF00C853.toInt(), 0xFFFF9100.toInt())
+        val fonts = intArrayOf(0, 2, 4, 8)
+        for (i in 0 until 19) {
+            val bgc = boxes[i % boxes.size]
+            out.add(TextTpl("Label ${i + 1}", "Basic", fonts[i % fonts.size], if (bgc in dark) 0xFF111111.toInt() else 0xFFFFFFFF.toInt(), 0, 0.08f, bgc, false, 0, i % 2 == 0))
+        }
+        // Fancy: 21 serif / script styles
+        val ffonts = intArrayOf(1, 3, 5, 9)
+        for (i in 0 until 21) {
+            val (n, c) = pal[(i * 2 + 3) % pal.size]
+            val st = if (i % 3 == 0) 0 else strokes[(i + 1) % strokes.size].let { if (it == c) 0xFF000000.toInt() else it }
+            out.add(TextTpl("Fancy $n", "Fancy", ffonts[i % ffonts.size], c, st, 0.09f, 0, true, 0, i % 2 == 1, i % 2 == 0))
+        }
+        // Bold: 25 effects x colours
+        val fxs = intArrayOf(2, 3, 4, 5, 2)
+        val fxn = mapOf(2 to "Shadow", 3 to "Glitch", 4 to "Outline", 5 to "Gradient")
+        for (i in 0 until 25) {
+            val fx = fxs[i % fxs.size]
+            val (n, c) = pal[(i * 3 + 1) % pal.size]
+            out.add(TextTpl("${fxn[fx]} $n", "Bold", 6, if (fx == 3 || fx == 5) 0xFFFFFFFF.toInt() else c, 0, 0.08f, 0, false, fx))
+        }
+        // Soft: 20 light elegant looks on soft boxes
+        val sfonts = intArrayOf(7, 9, 1, 8)
+        for (i in 0 until 20) {
+            val (n, c) = pal[(i * 5 + 2) % pal.size]
+            val bgc = if (i % 2 == 0) 0x55000000 else 0
+            out.add(TextTpl("Soft $n", "Soft", sfonts[i % sfonts.size], c, 0, 0.08f, bgc, true, 0, false, i % 3 == 0))
+        }
+        return out
+    }
 
     private fun styleSample(base: Clip, text: String): Bitmap? {
         val t = base.deepCopy(-1L)
@@ -2315,7 +2369,7 @@ class MainActivity : AppCompatActivity() {
             content.removeAllViews()
             when (tab) {
                 0 -> { // templates
-                    val cats = listOf("Trending", "Basic", "Fancy")
+                    val cats = listOf("Trending", "Basic", "Fancy", "Neon", "Bold", "Soft")
                     val g = grid()
                     fun fill() {
                         g.removeAllViews()
