@@ -72,6 +72,9 @@ class MainActivity : AppCompatActivity() {
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         if (ok) voiceoverDialog() else toast("Microphone permission is needed to record a voiceover")
     }
+    private var bgPhotoCb: ((Uri) -> Unit)? = null
+    private val bgPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); bgPhotoCb?.invoke(it) } }
+    private val camLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r -> r.data?.data?.let { loadVideo(it) } }
     private val srtPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); readSrt(it) } }
 
     private fun persist(u: Uri) {
@@ -220,6 +223,13 @@ class MainActivity : AppCompatActivity() {
             }
         } else if (intent.getBooleanExtra("pick", false)) {
             ui.postDelayed({ pickVideo() }, 250)
+        } else if (intent.getBooleanExtra("camera", false)) {
+            ui.postDelayed({
+                try { camLauncher.launch(Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE)) } catch (_: Exception) { toast("No camera app found") }
+            }, 250)
+        } else if (intent.hasExtra("videoUri")) {
+            val vu = Uri.parse(intent.getStringExtra("videoUri"))
+            ui.postDelayed({ loadVideo(vu) }, 250)
         }
         syncUi()
         tickLoop()
@@ -917,21 +927,28 @@ class MainActivity : AppCompatActivity() {
     private fun removeBgDialog() {
         val c = need(true) ?: return
         val srcLen = c.srcOutMs - c.srcInMs
-        val names = listOf("Blur", "Black", "White", "Green", "Blue", "Grey")
-        val cols = intArrayOf(0, 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF00B140.toInt(), 0xFF1E5BFF.toInt(), 0xFF808080.toInt())
+        val names = listOf("Blur", "Black", "White", "Green", "Blue", "Grey", "My photo")
+        val cols = intArrayOf(0, 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF00B140.toInt(), 0xFF1E5BFF.toInt(), 0xFF808080.toInt(), 0xFF000000.toInt())
         var pick = 0
+        var photoUri: Uri? = null
         var dlg: Dialog? = null
-        val chipRow = chips(names, 0) { pick = it }
+        val chipRow = chips(names, 0) {
+            pick = it
+            if (it == 6) { bgPhotoCb = { u -> photoUri = u; toast("Photo chosen") }; bgPicker.launch(arrayOf("image/*")) }
+        }
         val go = button("Remove background") {
             if (srcLen > 20000) { toast("Remove BG works on clips up to 20 s — cut the clip shorter first"); return@button }
             dlg?.dismiss()
             val id = c.id
             val uri = c.uri; val inMs = c.srcInMs; val outMs = c.srcOutMs
             val blur = pick == 0; val color = cols[pick]
+            if (pick == 6 && photoUri == null) { toast("Choose a photo first (tap My photo)"); return@button }
+            val photoU = if (pick == 6) photoUri else null
             val oldCopy = c.deepCopy(project.newId())
             runWork("Removing background") { progress ->
                 val r = FrameVideo.openRetriever(this, uri) ?: return@runWork null
-                val seg = RemoveBg(blur, color)
+                val photo = photoU?.let { u -> try { contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it) } } catch (_: Throwable) { null } }
+                val seg = RemoveBg(blur, color, photo)
                 val fps = 30
                 val n = max(1, (srcLen * fps / 1000L).toInt())
                 val out = File(File(filesDir, "reversed"), "B_" + System.currentTimeMillis() + ".mp4")
@@ -977,7 +994,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         dlg = sheet("Remove BG", label("New background"), chipRow, go,
-            label("Finds the person in every frame and replaces everything behind them with a blur or a plain colour. Works best on one person filmed from the chest up (like a selfie) with a clearly different background. It is a simple on-device model: hair and hands can have rough edges, and it will not cut out objects or animals. Works on clips up to 20 s and takes a while. A new video is made, so you can Undo."))
+            label("Finds the person in every frame and replaces everything behind them with a blur, a plain colour or a photo from your gallery. (A see-through cut-out is not possible: the video format has no transparency.) Works best on one person filmed from the chest up (like a selfie) with a clearly different background. It is a simple on-device model: hair and hands can have rough edges, and it will not cut out objects or animals. Works on clips up to 20 s and takes a while. A new video is made, so you can Undo."))
     }
 
     private fun freezeFrame() {

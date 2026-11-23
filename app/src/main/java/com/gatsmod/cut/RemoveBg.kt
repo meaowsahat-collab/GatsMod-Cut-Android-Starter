@@ -8,7 +8,7 @@ import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import java.util.concurrent.TimeUnit
 
 /** Replaces the background behind a person using ML Kit's on-device selfie segmentation (the model ships inside the app). */
-class RemoveBg(private val blurBackground: Boolean, private val color: Int) {
+class RemoveBg(private val blurBackground: Boolean, private val color: Int, private val photo: Bitmap? = null) {
     private val segmenter = Segmentation.getClient(
         SelfieSegmenterOptions.Builder().setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE).enableRawSizeMask().build()
     )
@@ -38,6 +38,14 @@ class RemoveBg(private val blurBackground: Boolean, private val color: Int) {
             val big = Bitmap.createScaledBitmap(small, w, h, true)
             bg = IntArray(w * h); big.getPixels(bg, 0, w, 0, 0, w, h)
             small.recycle(); big.recycle()
+        }
+        if (photo != null) {
+            // centre-crop the photo to the frame
+            val k = maxOf(w.toFloat() / photo.width, h.toFloat() / photo.height)
+            val sw = (w / k).toInt().coerceIn(1, photo.width); val sh = (h / k).toInt().coerceIn(1, photo.height)
+            val crop = Bitmap.createBitmap(photo, (photo.width - sw) / 2, (photo.height - sh) / 2, sw, sh)
+            val scaled = Bitmap.createScaledBitmap(crop, w, h, true)
+            bg = IntArray(w * h); scaled.getPixels(bg, 0, w, 0, 0, w, h)
         }
         for (y in 0 until h) for (x in 0 until w) {
             val a = MaskMath.edge(MaskMath.sample(m, mw, mh, x, y, w, h))

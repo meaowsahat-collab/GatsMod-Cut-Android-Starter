@@ -58,6 +58,11 @@ dependencies {
     // on-device person segmentation for Remove BG
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
     // offline speech recognition for Auto captions
+    implementation("androidx.camera:camera-core:1.3.4")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-video:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.alphacephei:vosk-android:0.3.47")
 }
