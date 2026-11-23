@@ -116,8 +116,9 @@ class MainActivity : AppCompatActivity() {
             engine.pause()
             project.checkpoint()
         }
-        overlayView.onVideoGesture = { ds, dx, dy, dr ->
-            gScale = (gScale * ds).coerceIn(0.1f, 8f); gDx += dx; gDy += dy; gRot += dr
+        overlayView.onAutoSelect = { syncUi() }
+        overlayView.onVideoGesture = { ts, dx, dy, dr ->
+            gScale = ts; gDx = dx; gDy = dy; gRot = dr
             pv.scaleX = gScale; pv.scaleY = gScale; pv.translationX = gDx; pv.translationY = gDy; pv.rotation = gRot
         }
         overlayView.onVideoGestureEnd = {

@@ -276,27 +276,55 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
                 canvas.drawText("⤡", z[0], z[1] + hr * 0.42f, handleText)
             }
         }
+        if (gesturing) drawGesture(canvas)
     }
 
-    /** Gesture on the selected video clip: (scale factor, dx px, dy px, rotation deg), all since the last call. */
+    /** Gesture on the video clip: totals since the finger(s) went down (scale, dx px, dy px, rotation deg), after snapping. */
     var onVideoGesture: ((Float, Float, Float, Float) -> Unit)? = null
     var onVideoGestureStart: (() -> Unit)? = null
     var onVideoGestureEnd: (() -> Unit)? = null
+    var onAutoSelect: ((Clip) -> Unit)? = null
     private var gesturing = false
     private var lastDist = 1f
     private var lastAngle = 0f
     private var lastMx = 0f
     private var lastMy = 0f
+    private var rawS = 1f; private var rawX = 0f; private var rawY = 0f; private var rawR = 0f
+    private var snapX = false; private var snapY = false
+    private val guide = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF25F4EE.toInt(); style = Paint.Style.STROKE; strokeWidth = 2f * context.resources.displayMetrics.density }
 
     fun canvasRect(): RectF = videoRect()
 
     private fun dist(e: MotionEvent) = Math.hypot((e.getX(1) - e.getX(0)).toDouble(), (e.getY(1) - e.getY(0)).toDouble()).toFloat().coerceAtLeast(1f)
     private fun angle(e: MotionEvent) = Math.toDegrees(Math.atan2((e.getY(1) - e.getY(0)).toDouble(), (e.getX(1) - e.getX(0)).toDouble())).toFloat()
 
-    /** One finger moves the video, two fingers pinch to resize and twist to rotate it. */
+    private fun publish() {
+        val snap = 9f * dens
+        snapX = Math.abs(rawX) < snap; snapY = Math.abs(rawY) < snap
+        val ex = if (snapX) 0f else rawX
+        val ey = if (snapY) 0f else rawY
+        var er = rawR
+        val near = Math.round(rawR / 90f) * 90f
+        if (Math.abs(rawR - near) < 4f) er = near
+        val es = if (Math.abs(rawS - 1f) < 0.03f) 1f else rawS
+        effS = es; effX = ex; effY = ey; effR = er
+        onVideoGesture?.invoke(es, ex, ey, er)
+        invalidate()
+    }
+    var effS = 1f; private set
+    var effX = 0f; private set
+    var effY = 0f; private set
+    var effR = 0f; private set
+
+    /** One finger moves the video, two fingers pinch to resize and twist to rotate it; it snaps to the centre like CapCut. */
     private fun videoTouch(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { gesturing = true; lastMx = e.x; lastMy = e.y; onVideoGestureStart?.invoke() }
+            MotionEvent.ACTION_DOWN -> {
+                gesturing = true; lastMx = e.x; lastMy = e.y
+                rawS = 1f; rawX = 0f; rawY = 0f; rawR = 0f
+                onVideoGestureStart?.invoke()
+                publish()
+            }
             MotionEvent.ACTION_POINTER_DOWN -> if (e.pointerCount >= 2) {
                 lastDist = dist(e); lastAngle = angle(e)
                 lastMx = (e.getX(0) + e.getX(1)) / 2f; lastMy = (e.getY(0) + e.getY(1)) / 2f
@@ -308,27 +336,45 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
                     var da = a - lastAngle
                     while (da > 180f) da -= 360f
                     while (da < -180f) da += 360f
-                    onVideoGesture?.invoke(d / lastDist, mx - lastMx, my - lastMy, da)
+                    rawS = (rawS * d / lastDist).coerceIn(0.1f, 8f); rawX += mx - lastMx; rawY += my - lastMy; rawR += da
                     lastDist = d; lastAngle = a; lastMx = mx; lastMy = my
                 } else {
-                    onVideoGesture?.invoke(1f, e.x - lastMx, e.y - lastMy, 0f)
+                    rawX += e.x - lastMx; rawY += e.y - lastMy
                     lastMx = e.x; lastMy = e.y
                 }
+                publish()
             }
             MotionEvent.ACTION_POINTER_UP -> {
                 val keep = if (e.actionIndex == 0) 1 else 0
                 if (keep < e.pointerCount) { lastMx = e.getX(keep); lastMy = e.getY(keep) }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (gesturing) { gesturing = false; onVideoGestureEnd?.invoke() }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (gesturing) { gesturing = false; onVideoGestureEnd?.invoke(); invalidate() }
         }
         return true
+    }
+
+    private fun drawGesture(canvas: Canvas) {
+        val r = videoRect()
+        canvas.save()
+        canvas.translate(effX, effY)
+        canvas.rotate(effR, r.centerX(), r.centerY())
+        canvas.scale(effS, effS, r.centerX(), r.centerY())
+        canvas.drawRect(r, guide)
+        canvas.restore()
+        val L = 44f * dens
+        if (snapX) { canvas.drawLine(r.centerX(), r.top - L, r.centerX(), r.top, guide); canvas.drawLine(r.centerX(), r.bottom, r.centerX(), r.bottom + L, guide) }
+        if (snapY) { canvas.drawLine(r.left - L, r.centerY(), r.left, r.centerY(), guide); canvas.drawLine(r.right, r.centerY(), r.right + L, r.centerY(), guide) }
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val p = project ?: return false
         val r = videoRect()
-        val vs = p.selected()
-        if (vs != null && vs.kind == LaneKind.VIDEO && p.mainClipAt(playheadMs)?.id == vs.id) return videoTouch(e)
+        var vs = p.selected()
+        if (vs == null) vs = p.mainClipAt(playheadMs)?.takeIf { it.kind == LaneKind.VIDEO }
+        if (vs != null && vs.kind == LaneKind.VIDEO && p.mainClipAt(playheadMs)?.id == vs.id) {
+            if (e.actionMasked == MotionEvent.ACTION_DOWN && p.selectedId != vs.id) { p.selectedId = vs.id; onAutoSelect?.invoke(vs) }
+            return videoTouch(e)
+        }
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val s = p.selected() ?: return false
