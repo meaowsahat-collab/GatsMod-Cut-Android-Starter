@@ -362,7 +362,8 @@ object Anim {
         if (isMask(animIn) && d[0] > 0 && tMs < d[0]) { id = animIn; p = tMs.toFloat() / d[0] }
         else if (isMask(animOut) && d[1] > 0 && tMs > lenMs - d[1]) { id = outSrc(animOut); p = (lenMs - tMs).toFloat() / d[1] }
         if (id == 0) return floatArrayOf(0f, 1f)
-        val shape = id - 23                       // 24,25,26 -> 1,2,3
+        val maskBase = if (id in 200..299) extraBase(id) else id
+        val shape = maskBase - 23                 // 24,25,26 -> 1,2,3
         val big = if (shape == 2) 1.9f else 2.8f
         return floatArrayOf(shape.toFloat(), max(0.02f, easeOut(p.coerceIn(0f, 1f)) * big))
     }
