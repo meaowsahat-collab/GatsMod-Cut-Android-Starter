@@ -1768,15 +1768,19 @@ class MainActivity : AppCompatActivity() {
         val c = need(true) ?: return
         project.checkpoint()
         val before = c.paramSig()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(4), dp(8), dp(4)) }
+        val search = EditText(this).apply {
+            hint = "Search video effects"; textSize = 14f; singleLine = true
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(0xFF34343B.toInt()) }
+        }
+        root.addView(search, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
         val tabs = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val tabRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tabs.addView(tabRow)
-        root.addView(tabs)
+        tabs.addView(tabRow); root.addView(tabs)
         val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val scroll = ScrollView(this)
-        scroll.addView(grid)
-        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(250)))
+        val scroll = ScrollView(this); scroll.addView(grid)
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(270)))
         val intensityLabel = label("Intensity · ${(c.fxAmount * 100).toInt()}%") as TextView
         root.addView(intensityLabel)
         val intensity = SeekBar(this).apply { max = 100; progress = (c.fxAmount * 100).toInt() }
@@ -1791,61 +1795,53 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
         val groups = listOf(
-            "Video effects" to listOf("None", "Glitch", "Pixelate", "Wave", "Sharpen", "Glow", "Vignette", "Mirror", "Poster", "Film grain", "Scanlines"),
-            "Body effects" to listOf("Glow", "Wave", "Glitch", "Pixelate", "Mirror", "Sharpen"),
-            "Style" to listOf("Vignette", "Film grain", "Scanlines", "Poster", "Mirror", "Sharpen")
+            "Trending" to listOf("None", "Glow", "Glitch", "Wave", "Pixelate", "Sharpen", "Vignette"),
+            "Classic" to listOf("Mirror", "Poster", "Film grain", "Scanlines", "Vignette", "Sharpen"),
+            "Style" to listOf("Poster", "Glow", "Mirror", "Film grain", "Scanlines", "Pixelate"),
+            "Popular" to listOf("Glitch", "Wave", "Pixelate", "Mirror", "Glow", "Sharpen")
         )
         var selectedGroup = 0
+        var query = ""
         fun rebuild() {
             tabRow.removeAllViews()
             groups.forEachIndexed { i, group ->
-                val t = TextView(this).apply {
-                    text = group.first
-                    textSize = 13f
-                    gravity = Gravity.CENTER
-                    setPadding(dp(14), dp(10), dp(14), dp(10))
+                tabRow.addView(TextView(this).apply {
+                    text = group.first; textSize = 14f; gravity = Gravity.CENTER
+                    setPadding(dp(16), dp(12), dp(16), dp(12))
                     setTextColor(if (i == selectedGroup) CYAN else 0xFFE6E6EA.toInt())
                     setOnClickListener { selectedGroup = i; rebuild() }
-                }
-                tabRow.addView(t)
+                })
             }
             grid.removeAllViews()
-            val row: LinearLayout
-            var current: LinearLayout? = null
-            groups[selectedGroup].second.forEachIndexed { index, name ->
-                if (index % 3 == 0) {
-                    current = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-                    grid.addView(current, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(86)))
-                }
+            val names = groups[selectedGroup].second.filter { it.contains(query, true) }
+            var row: LinearLayout? = null
+            names.forEachIndexed { index, name ->
+                if (index % 3 == 0) { row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; grid.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116))) }
                 val effectIndex = GlFxNames.EFFECTS.indexOf(name).coerceAtLeast(0)
                 val tile = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-                    setPadding(dp(4), dp(5), dp(4), dp(4))
-                    background = GradientDrawable().apply {
-                        cornerRadius = dp(10).toFloat()
-                        setColor(0xFF292932.toInt())
-                        setStroke(dp(1), if (c.fx == effectIndex) CYAN else 0xFF44444C.toInt())
+                    orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(5), dp(5), dp(5), dp(5))
+                    background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(0xFF292932.toInt()); setStroke(dp(1), if (c.fx == effectIndex) CYAN else 0xFF44444C.toInt()) }
+                    val preview = TextView(this@MainActivity).apply {
+                        text = when(name) { "None" -> "⊘"; "Glitch" -> "▥"; "Pixelate" -> "▦"; "Wave" -> "〰"; "Sharpen" -> "✧"; "Glow" -> "✴"; "Film grain" -> "░"; "Mirror" -> "◐"; "Vignette" -> "◉"; "Scanlines" -> "▤"; "Poster" -> "▰"; else -> "✦" }
+                        textSize = 34f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                        background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0xFF52525C.toInt(), 0xFF24242B.toInt(), 0xFF383844.toInt())).apply { cornerRadius = dp(10).toFloat() }
                     }
-                    val art = TextView(this@MainActivity).apply {
-                        text = when(name) { "None" -> "⊘"; "Glitch" -> "▥"; "Pixelate" -> "▦"; "Wave" -> "〰"; "Sharpen" -> "✧"; "Glow" -> "✴"; "Film grain" -> "░"; "Glow" -> "✴"; "Mirror" -> "◐"; "Vignette" -> "◉"; "Film grain" -> "░"; "Scanlines" -> "▤"; "Poster" -> "▰"; else -> "✦" }
-                        textSize = 28f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-                    }
-                    addView(art, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
-                    addView(TextView(this@MainActivity).apply { text = name; textSize = 11f; gravity = Gravity.CENTER; setTextColor(if (c.fx == effectIndex) CYAN else Color.WHITE) })
+                    addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72)))
+                    addView(TextView(this@MainActivity).apply { text = name; textSize = 12f; gravity = Gravity.CENTER; setTextColor(if (c.fx == effectIndex) CYAN else Color.WHITE); setPadding(0, dp(5), 0, 0) })
                     setOnClickListener { c.fx = effectIndex; intensity.progress = (c.fxAmount * 100).toInt(); live(); rebuild() }
                 }
-                current?.addView(tile, LinearLayout.LayoutParams(0, dp(82), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
+                row?.addView(tile, LinearLayout.LayoutParams(0, dp(108), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
             }
-            current?.let { while (it.childCount < 3) it.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f)) }
-            if (selectedGroup == 1) {
-                grid.addView(label("These are general visual effects; automatic body tracking or person segmentation is not included yet."))
-            }
+            row?.let { while (it.childCount < 3) it.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f)) }
+            if (names.isEmpty()) grid.addView(label("No effects found"))
         }
-        rebuild()
-        sheet("Effects", root, onClose = {
-            if (c.paramSig() == before) project.discardCheckpoint()
-            afterEdit()
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { query = s?.toString() ?: ""; rebuild() }
+            override fun beforeTextChanged(s: CharSequence?, st: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, before: Int, count: Int) {}
         })
+        rebuild()
+        sheet("Video effects", root, onClose = { if (c.paramSig() == before) project.discardCheckpoint(); afterEdit() })
     }
 
     private fun maskDialog() {
