@@ -214,7 +214,7 @@ class Updater(private val activity: Activity) {
             pendingApk = apk
             AlertDialog.Builder(activity)
                 .setTitle("Allow installing updates")
-                .setMessage("Android needs your permission once so GatsMod Cut can install its own updates. Turn it on, then come back to the app.")
+                .setMessage("Android needs your permission once so Get Cut can install its own updates. Turn it on, then come back to the app.")
                 .setPositiveButton("Open settings") { _, _ ->
                     activity.startActivity(
                         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}"))

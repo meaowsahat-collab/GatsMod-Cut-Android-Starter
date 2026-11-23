@@ -92,6 +92,7 @@ class MainActivity : AppCompatActivity() {
             previous?.uncaughtException(t, e)
         }
         setContentView(R.layout.activity_main)
+        EditorTheme.apply(this)
         engine = PreviewEngine(this, project)
 
         val pv = findViewById<PlayerView>(R.id.playerView)
@@ -2626,8 +2627,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun aboutDialog() {
-        sheet("GatsMod Cut", label("Version ${versionName()}"), button("Check for updates") { updater.check(false) },
-            button("Project info") { projectDialog() })
+        sheet("Get Cut", label("Version ${versionName()}"), button("Check for updates") { updater.check(false) },
+            button("Project info") { projectDialog() }, EditorTheme.picker(this) { EditorTheme.apply(this) })
     }
 
     private fun toggleFullscreen() {

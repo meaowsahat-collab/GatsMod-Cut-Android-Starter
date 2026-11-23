@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <!-- play triangle -->
+  <path android:fillColor="#FFFFFFFF" android:pathData="M42,32 L78,54 L42,76 Z"/>
+  <!-- cut line -->
+  <path android:strokeColor="#FF7C4DFF" android:strokeWidth="4" android:strokeLineCap="round" android:pathData="M54,28 L54,80"/>
+  <!-- scissor handles -->
+  <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M30,40 L30,68"/>
+</vector>

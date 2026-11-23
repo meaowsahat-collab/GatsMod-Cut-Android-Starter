@@ -50,6 +50,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
     private val gap = dp(3f)
 
     private val bg = Paint().apply { color = 0xFF0D0D10.toInt() }
+    fun setBgColor(c: Int) { bg.color = c; invalidate() }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val thumbPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.STROKE; strokeWidth = dp(2f) }

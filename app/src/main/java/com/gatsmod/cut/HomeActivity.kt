@@ -326,6 +326,6 @@ class HomeActivity : AppCompatActivity() {
 
     private fun aboutDialog() {
         val v = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "" }
-        lightSheet("GatsMod Cut  v$v", row("Check for updates") { updater.check(false) })
+        lightSheet("Get Cut  v$v", row("Check for updates") { updater.check(false) }, EditorTheme.picker(this) {})
     }
 }
