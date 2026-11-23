@@ -1766,10 +1766,88 @@ class MainActivity : AppCompatActivity() {
 
     private fun effectsDialog() {
         val c = need(true) ?: return
-        lookSheet("Effects", c,
-            chips(GlFxNames.EFFECTS, c.fx) { c.fx = it; live() },
-            slider("Intensity", 0f, 1f, c.fxAmount, { "%d".format((it * 100).toInt()) }) { c.fxAmount = it; live() },
-            slider("Blur", 0f, 25f, c.blur, { "%.0f".format(it) }) { c.blur = it; live() })
+        project.checkpoint()
+        val before = c.paramSig()
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val tabs = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val tabRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        tabs.addView(tabRow)
+        root.addView(tabs)
+        val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(this)
+        scroll.addView(grid)
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(250)))
+        val intensityLabel = label("Intensity · ${(c.fxAmount * 100).toInt()}%")
+        root.addView(intensityLabel)
+        val intensity = SeekBar(this).apply { max = 100; progress = (c.fxAmount * 100).toInt() }
+        root.addView(intensity)
+        intensity.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, value: Int, user: Boolean) {
+                c.fxAmount = value / 100f
+                intensityLabel.text = "Intensity · ${value}%"
+                live()
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+        val groups = listOf(
+            "Video effects" to listOf("None", "Glitch", "Pixelate", "Wave", "Sharpen"),
+            "Body effects" to listOf("Glow", "Wave", "Glitch", "Pixelate", "Mirror"),
+            "Style effects" to listOf("Vignette", "Film grain", "Scanlines", "Poster", "Mirror")
+        )
+        var selectedGroup = 0
+        fun rebuild() {
+            tabRow.removeAllViews()
+            groups.forEachIndexed { i, group ->
+                val t = TextView(this).apply {
+                    text = group.first
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setPadding(dp(14), dp(10), dp(14), dp(10))
+                    setTextColor(if (i == selectedGroup) CYAN else 0xFFE6E6EA.toInt())
+                    setOnClickListener { selectedGroup = i; rebuild() }
+                }
+                tabRow.addView(t)
+            }
+            grid.removeAllViews()
+            val row: LinearLayout
+            var current: LinearLayout? = null
+            groups[selectedGroup].second.forEachIndexed { index, name ->
+                if (index % 3 == 0) {
+                    current = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                    grid.addView(current, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(86)))
+                }
+                val effectIndex = GlFxNames.EFFECTS.indexOf(name).coerceAtLeast(0)
+                val tile = TextView(this).apply {
+                    text = name
+                    textSize = 12f
+                    gravity = Gravity.CENTER
+                    setPadding(dp(5), dp(5), dp(5), dp(5))
+                    setTextColor(if (c.fx == effectIndex) CYAN else Color.WHITE)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(10).toFloat()
+                        setColor(0xFF292932.toInt())
+                        setStroke(dp(1), if (c.fx == effectIndex) CYAN else 0xFF44444C.toInt())
+                    }
+                    setOnClickListener {
+                        c.fx = effectIndex
+                        intensity.progress = (c.fxAmount * 100).toInt()
+                        live()
+                        rebuild()
+                    }
+                }
+                current?.addView(tile, LinearLayout.LayoutParams(0, dp(72), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
+            }
+            current?.let { while (it.childCount < 3) it.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f)) }
+            if (selectedGroup == 1) {
+                grid.addView(label("These are general visual effects; automatic body tracking or person segmentation is not included yet."))
+            }
+        }
+        rebuild()
+        sheet("Effects", root, onClose = {
+            if (c.paramSig() == before) project.discardCheckpoint()
+            afterEdit()
+        })
     }
 
     private fun maskDialog() {
