@@ -374,6 +374,12 @@ object Anim {
      * The combined pose at [tMs] (ms since the clip start on the timeline) for a clip [lenMs] long.
      * In and Out lengths are shortened if together they would be longer than the clip.
      */
+    fun poseOf(c: Clip, tMs: Long): Pose {
+        var p = pose(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, tMs, c.lengthMs)
+        if (c.textMotion != 0) p *= ProText.pose(c.textMotion, tMs)
+        return p
+    }
+
     fun pose(animIn: Int, inMs: Long, animOut: Int, outMs: Long, combo: Int, tMs: Long, lenMs: Long): Pose {
         val d = durs(animIn, inMs, animOut, outMs, lenMs)
         val a = d[0]

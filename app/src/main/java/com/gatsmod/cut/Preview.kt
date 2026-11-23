@@ -213,7 +213,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val key = "${c.id}|${c.paramSig()}"
         if (!force && key == appliedKey) return
         appliedKey = key
-        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${c.animInMs}|${c.animOut}|${c.animOutMs}|${c.animCombo}|${if (c.hasAnim) c.lengthMs else 0L}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
+        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${c.animInMs}|${c.animOut}|${c.animOutMs}|${c.animCombo}|${c.textMotion}|${if (c.hasAnim) c.lengthMs else 0L}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
             "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
             c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" } else "off"
         if (fxKey != appliedFx) {

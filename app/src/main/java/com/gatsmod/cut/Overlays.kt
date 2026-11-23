@@ -84,7 +84,7 @@ object OverlayRenderer {
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .build()
         val strokeW = if (c.textFx == 4) ts * 0.07f else if (c.strokeColor != 0) ts * c.strokeW.coerceIn(0.01f, 0.3f) else 0f
-        val pad = (ts * 0.25f + strokeW + (if (c.textFx == 1) ts * 0.5f else 0f) + (if (c.textFx == 2) ts * 0.3f else 0f) + (if (c.bgColor != 0) ts * 0.15f else 0f)).toInt() + 2
+        val pad = (ts * 0.25f + strokeW + (if (c.textFx == 1) ts * 0.5f else 0f) + (if (c.textFx == 2) ts * 0.3f else 0f) + (if (c.textFx >= 10) ts * 0.7f else 0f) + (if (c.bgColor != 0) ts * 0.15f else 0f)).toInt() + 2
         var textW = 1
         for (i in 0 until layout.lineCount) textW = max(textW, Math.ceil(layout.getLineWidth(i).toDouble()).toInt())
         val bmp = Bitmap.createBitmap(textW + pad * 2, layout.height + pad * 2, Bitmap.Config.ARGB_8888)
@@ -105,6 +105,29 @@ object OverlayRenderer {
                 canvas.save(); canvas.translate(-ts * 0.05f, 0f); draw { paint.color = 0xCC00E5FF.toInt() }; canvas.restore()
                 canvas.save(); canvas.translate(ts * 0.05f, 0f); draw { paint.color = 0xCCFF1744.toInt() }; canvas.restore()
             }
+        }
+        if (c.textFx >= 10) {
+            fun glow(r: Float, col: Int, dx: Float = 0f, dy: Float = 0f) = draw { paint.color = c.color; paint.setShadowLayer(ts * r, dx, dy, col) }
+            when (c.textFx) {
+                10 -> { glow(0.55f, 0xFFFF0054.toInt(), 0f, -ts * 0.22f); glow(0.3f, 0xFFFF5400.toInt(), 0f, -ts * 0.12f); glow(0.12f, 0xFFFF9F1C.toInt()) }
+                11 -> { glow(0.6f, 0xFF3B82F6.toInt()); glow(0.35f, 0xFF00BBF9.toInt()); glow(0.15f, 0xFF00F5D4.toInt()) }
+                12 -> {
+                    canvas.save(); canvas.translate(-ts * 0.07f, 0f); draw { paint.color = 0xFFFF0055.toInt() }; canvas.restore()
+                    canvas.save(); canvas.translate(ts * 0.07f, 0f); draw { paint.color = 0xFF00F5D4.toInt() }; canvas.restore()
+                }
+                13 -> {
+                    canvas.save(); canvas.translate(ts * 0.1f, ts * 0.1f); draw { paint.color = 0xFF6366F1.toInt() }; canvas.restore()
+                    canvas.save(); canvas.translate(ts * 0.05f, ts * 0.05f); draw { paint.color = 0xFFEC4899.toInt() }; canvas.restore()
+                    draw { paint.style = Paint.Style.STROKE; paint.strokeWidth = ts * 0.07f; paint.strokeJoin = Paint.Join.ROUND; paint.color = 0xFF0F172A.toInt() }
+                }
+                14 -> {}
+            }
+            draw {
+                if (c.textFx == 14) paint.shader = android.graphics.LinearGradient(0f, 0f, layout.width.toFloat(), 0f,
+                    intArrayOf(0xFFFF0080.toInt(), 0xFFFF8C00.toInt(), 0xFF40E0D0.toInt(), 0xFF8A2BE2.toInt(), 0xFFFF0080.toInt()), null, android.graphics.Shader.TileMode.CLAMP)
+                else paint.color = c.color
+            }
+            return tilted(bmp, c.tilt)
         }
         if (strokeW > 0f) {
             draw {
@@ -176,7 +199,7 @@ class TimedOverlay(private val ctx: Context, private val clip: Clip, private val
     override fun getOverlaySettings(presentationTimeUs: Long): OverlaySettings {
         if (!clip.hasAnim) return settings
         val local = ((presentationTimeUs - startUs) / 1000L).coerceAtLeast(0L)
-        val p = Anim.pose(clip.animIn, clip.animInMs, clip.animOut, clip.animOutMs, clip.animCombo, local, clip.lengthMs)
+        val p = Anim.poseOf(clip, local)
         return OverlaySettings.Builder()
             .setBackgroundFrameAnchor(clip.posX * 2f - 1f + p.x, 1f - clip.posY * 2f + p.y)
             .setScale(p.sx, p.sy)
@@ -257,7 +280,7 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
             canvas.save()
             val pp = Paint(paint)
             if (c.hasAnim) {
-                val p = Anim.pose(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, playheadMs - c.startMs, c.lengthMs)
+                val p = Anim.poseOf(c, playheadMs - c.startMs)
                 canvas.translate(p.x / 2f * r.width(), -p.y / 2f * r.height())
                 canvas.rotate(p.rot, bounds.centerX(), bounds.centerY())
                 canvas.scale(p.sx, p.sy, bounds.centerX(), bounds.centerY())

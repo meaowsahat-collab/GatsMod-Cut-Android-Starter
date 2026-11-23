@@ -2390,10 +2390,33 @@ class MainActivity : AppCompatActivity() {
                     content.addView(g)
                     fill()
                 }
+                6 -> { // 100 pro text animations
+                    val g = grid()
+                    fun fill() {
+                        g.removeAllViews()
+                        for (i in 0 until ProText.COUNT) {
+                            val probe = clip.deepCopy(-1L); ProText.apply(probe, i); probe.textMotion = 0
+                            val on = clip.textMotion == i / 5 + 1 && clip.textFx == 10 + i % 5
+                            g.addView(gridCell(tileW, pictureCell(styleSample(probe, "TEXT")), ProText.title(i), on) {
+                                ProText.apply(clip, i)
+                                changed(); fill()
+                            })
+                        }
+                    }
+                    val none = TextView(this)
+                    none.text = "Pro text animations loop while the text is on screen"
+                    none.textSize = 12f
+                    none.setTextColor(0xFF8E8E93.toInt())
+                    none.setPadding(dp(6), 0, 0, dp(6))
+                    content.addView(none)
+                    content.addView(button("Remove pro animation") { clip.textMotion = 0; if (clip.textFx >= 10) clip.textFx = 0; changed(); fill() })
+                    content.addView(g)
+                    fill()
+                }
             }
         }
 
-        val tabs = tabBar(listOf("Templates", "Fonts", "Styles", "Effects", "Stickers", "Animations"), 0, 17f) { i ->
+        val tabs = tabBar(listOf("Templates", "Fonts", "Styles", "Effects", "Stickers", "Animations", "Pro 100"), 0, 17f) { i ->
             if (i == 4) {
                 dlg?.dismiss()
                 ui.postDelayed({ stickerDialog() }, 150)

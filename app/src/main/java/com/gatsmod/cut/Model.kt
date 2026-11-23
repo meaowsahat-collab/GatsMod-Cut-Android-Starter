@@ -90,9 +90,10 @@ data class Clip(
     var shadow: Boolean = true,
     var italic: Boolean = false,
     var textFx: Int = 0,
-    var tilt: Float = 0f
+    var tilt: Float = 0f,
+    var textMotion: Int = 0
 ) {
-    val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0
+    val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0 || textMotion != 0
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
         get() = if (isMedia) max(1L, ((srcOutMs - srcInMs) / speed).toLong()) else durMs
@@ -103,7 +104,7 @@ data class Clip(
 
     /** Everything that changes how the clip looks/sounds in the preview (not its position). */
     fun paramSig(): String =
-        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|${stab.hashCode()}|$animIn|$animInMs|$animOut|$animOutMs|$animCombo|" +
+        "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|${stab.hashCode()}|$animIn|$animInMs|$animOut|$animOutMs|$animCombo|$textMotion|" +
             "${chroma.enabled}|${chroma.key}|${chroma.similarity}|${chroma.smooth}|${chroma.bg}|" +
             keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }
 }
