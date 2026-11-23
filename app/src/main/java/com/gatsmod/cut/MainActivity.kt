@@ -2318,8 +2318,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val tabs = tabBar(listOf("Templates", "Fonts", "Styles", "Effects", "Animations"), 0, 17f) { i ->
+        val tabs = tabBar(listOf("Templates", "Fonts", "Styles", "Effects", "Stickers", "Animations"), 0, 17f) { i ->
             if (i == 4) {
+                dlg?.dismiss()
+                ui.postDelayed({ stickerDialog() }, 150)
+            } else if (i == 5) {
                 dlg?.dismiss()
                 ui.postDelayed({ animationsFor(clip) }, 150)
             } else { tab = i; showTab() }
@@ -2357,6 +2360,8 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------------------------------------------------------- stickers
 
+    private val gifThumbCache = HashMap<String, Bitmap?>()
+
     private fun stickerDialog() {
         if (project.isEmpty()) { toast("Import a video first"); return }
         engine.pause()
@@ -2365,57 +2370,139 @@ class MainActivity : AppCompatActivity() {
         var dlg: Dialog? = null
         var cat = 0
         var query = ""
-        val g = android.widget.GridLayout(this)
-        g.columnCount = 4
-        val scroll = ScrollView(this)
-        scroll.addView(g)
-        scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+        var gQuery = ""
+        var tabIdx = 0
 
-        fun fill() {
-            g.removeAllViews()
-            val list = if (query.isNotBlank()) StickerArt.ALL.filter { (it.label + " " + it.tags).contains(query.trim(), ignoreCase = true) }
-                       else StickerArt.ALL.filter { it.cat == StickerArt.CATS[cat] }
-            for (s in list) {
-                val bmp = try { StickerArt.render(s, 200) } catch (_: Throwable) { null }
-                g.addView(gridCell(tileW, pictureCell(bmp), "", false) {
-                    val c = newFree(LaneKind.OVERLAY, s.label) ?: return@gridCell
-                    c.uri = "sticker:" + s.id
-                    c.sizeFrac = when (s.kind) { "badge" -> 0.5f; "banner" -> 0.6f; "emoji" -> 0.22f; else -> if (s.glyph == "bar") 0.9f else 0.26f }
-                    c.posX = 0.5f; c.posY = 0.5f
-                    afterEdit()
-                })
+        fun newGrid() = android.widget.GridLayout(this).also { it.columnCount = 4 }
+        val body = LinearLayout(this)
+        body.orientation = LinearLayout.VERTICAL
+        body.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+
+        fun searchBox(hint: String, onText: (String) -> Unit): EditText {
+            val search = EditText(this)
+            search.hint = hint
+            search.setHintTextColor(grey); search.setTextColor(white); search.textSize = 15f
+            search.maxLines = 1
+            search.inputType = android.text.InputType.TYPE_CLASS_TEXT
+            search.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            val sb = GradientDrawable(); sb.cornerRadius = dp(10).toFloat(); sb.setColor(0xFF2C2C31.toInt())
+            search.background = sb
+            search.setPadding(dp(14), dp(8), dp(14), dp(8))
+            search.setOnEditorActionListener { v, _, _ -> onText(v.text.toString()); true }
+            return search
+        }
+
+        fun stickersBody() {
+            body.removeAllViews()
+            val g = newGrid()
+            val scroll = ScrollView(this)
+            scroll.addView(g)
+            scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            fun fill() {
+                g.removeAllViews()
+                val list = if (query.isNotBlank()) StickerArt.ALL.filter { (it.label + " " + it.tags).contains(query.trim(), ignoreCase = true) }
+                           else StickerArt.ALL.filter { it.cat == StickerArt.CATS[cat] }
+                for (s in list) {
+                    val bmp = try { StickerArt.render(s, 200) } catch (_: Throwable) { null }
+                    val anim = StickerArt.animOf(s.id)
+                    val cell: View = if (bmp != null) AnimTile(this, bmp, 2, anim, 0f, true) else View(this)
+                    g.addView(gridCell(tileW, cell, "", false) {
+                        val c = newFree(LaneKind.OVERLAY, s.label) ?: return@gridCell
+                        c.uri = "sticker:" + s.id
+                        c.sizeFrac = when (s.kind) { "badge" -> 0.5f; "banner" -> 0.6f; "emoji" -> 0.22f; else -> if (s.glyph == "bar") 0.9f else 0.26f }
+                        c.posX = 0.5f; c.posY = 0.5f
+                        c.animCombo = anim
+                        afterEdit()
+                    })
+                }
             }
+            val search = searchBox("Search stickers") { query = it; fill() }
+            search.addTextChangedListener(object : android.text.TextWatcher {
+                override fun afterTextChanged(e: android.text.Editable?) { query = e?.toString() ?: ""; fill() }
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
+            })
+            val catBar = tabBar(StickerArt.CATS, cat, 15f) { cat = it; query = ""; search.setText(""); fill() }
+            body.addView(search)
+            body.addView(catBar)
+            body.addView(scroll)
+            fill()
+        }
+
+        fun giphyBody() {
+            body.removeAllViews()
+            val key = Giphy.key(this)
+            if (key.isBlank()) {
+                val pad = dp(10)
+                val info = label("GIPHY has thousands of animated stickers. It needs a free key from GIPHY:\n1. Open developers.giphy.com and create an account\n2. Tap Create an App, choose API, copy the key\n3. Paste it here once")
+                info.setPadding(pad, dp(10), pad, dp(6))
+                val keyBox = searchBox("Paste your GIPHY API key") { }
+                val save = button("Save key") {
+                    val k = keyBox.text.toString().trim()
+                    if (k.length < 10) toast("That does not look like a GIPHY key") else { Giphy.setKey(this, k); giphyBody() }
+                }
+                body.addView(info); body.addView(keyBox); body.addView(save)
+                return
+            }
+            val g = newGrid()
+            val scroll = ScrollView(this)
+            scroll.addView(g)
+            scroll.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            val status = TextView(this).apply { setTextColor(grey); textSize = 13f; setPadding(dp(10), dp(6), dp(10), dp(6)) }
+            fun load() {
+                status.text = "Loading…"
+                g.removeAllViews()
+                val q = gQuery
+                Thread {
+                    val items = try { Giphy.load(key, q) } catch (e: Throwable) { null }
+                    runOnUiThread {
+                        if (items == null) { status.text = "Could not load GIPHY. Check the internet and the key."; return@runOnUiThread }
+                        status.text = if (items.isEmpty()) "Nothing found" else if (q.isBlank()) "Trending — tap one to add it" else "Results for \"$q\""
+                        for (it in items) {
+                            val iv = ImageView(this)
+                            iv.scaleType = ImageView.ScaleType.FIT_CENTER
+                            iv.setPadding(dp(6), dp(6), dp(6), dp(6))
+                            val cached = gifThumbCache[it.thumbUrl]
+                            if (cached != null) iv.setImageBitmap(cached) else Thread {
+                                val b = Giphy.thumb(it.thumbUrl)
+                                if (b != null) { gifThumbCache[it.thumbUrl] = b; runOnUiThread { iv.setImageBitmap(b) } }
+                            }.start()
+                            g.addView(gridCell(tileW, iv, "", false) {
+                                toast("Downloading…")
+                                Thread {
+                                    val f = Giphy.download(this, it)
+                                    runOnUiThread {
+                                        if (f == null) { toast("Could not download this sticker"); return@runOnUiThread }
+                                        val c = newFree(LaneKind.OVERLAY, "GIF") ?: return@runOnUiThread
+                                        c.uri = Uri.fromFile(f).toString()
+                                        c.sizeFrac = 0.35f; c.posX = 0.5f; c.posY = 0.5f
+                                        afterEdit()
+                                    }
+                                }.start()
+                            })
+                        }
+                    }
+                }.start()
+            }
+            val search = searchBox("Search GIPHY") { gQuery = it; load() }
+            val change = TextView(this).apply { text = "Change key"; setTextColor(grey); textSize = 12f; setPadding(dp(10), dp(4), dp(10), dp(4))
+                setOnClickListener { Giphy.setKey(this@MainActivity, ""); giphyBody() } }
+            body.addView(search); body.addView(status); body.addView(scroll); body.addView(change)
+            load()
         }
 
         val tick = ImageView(this)
         tick.setImageResource(R.drawable.ic_check)
         tick.setPadding(dp(10), dp(8), dp(10), dp(8))
         tick.setOnClickListener { dlg?.dismiss() }
-        val tabs = tabBar(listOf("Stickers", "GIPHY"), 0, 17f) { i ->
-            if (i == 1) toast("GIPHY needs an online service key, so it is not available in this app")
-        }
+        val tabs = tabBar(listOf("Stickers", "GIPHY"), 0, 17f) { i -> tabIdx = i; if (i == 0) stickersBody() else giphyBody() }
         val head = LinearLayout(this)
         head.orientation = LinearLayout.HORIZONTAL
         head.gravity = Gravity.CENTER_VERTICAL
         head.addView(tabs, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         head.addView(tick, LinearLayout.LayoutParams(dp(52), dp(44)))
-
-        val search = EditText(this)
-        search.hint = "Search stickers"
-        search.setHintTextColor(grey); search.setTextColor(white); search.textSize = 15f
-        search.maxLines = 1
-        search.inputType = android.text.InputType.TYPE_CLASS_TEXT
-        val sb = GradientDrawable(); sb.cornerRadius = dp(10).toFloat(); sb.setColor(0xFF2C2C31.toInt())
-        search.background = sb
-        search.setPadding(dp(14), dp(8), dp(14), dp(8))
-        search.addTextChangedListener(object : android.text.TextWatcher {
-            override fun afterTextChanged(e: android.text.Editable?) { query = e?.toString() ?: ""; fill() }
-            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
-            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c2: Int) {}
-        })
-        val catBar = tabBar(StickerArt.CATS, 0, 15f) { cat = it; query = ""; search.setText(""); fill() }
-        fill()
-        dlg = sheet("", head, search, catBar, scroll, showHeader = false, heightPx = dockHeight(), onClose = { afterEdit() })
+        stickersBody()
+        dlg = sheet("", head, body, showHeader = false, heightPx = dockHeight(), onClose = { afterEdit() })
         dlg?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 

@@ -13,7 +13,7 @@ import android.view.View
 import kotlin.math.max
 
 /** A tile of the Animations panel: the clip's own picture playing the animation in a loop, like CapCut's thumbnails. */
-class AnimTile(ctx: Context, private val pic: Bitmap?, private val mode: Int, private val id: Int, private val radius: Float) : View(ctx) {
+class AnimTile(ctx: Context, private val pic: Bitmap?, private val mode: Int, private val id: Int, private val radius: Float, private val fit: Boolean = false) : View(ctx) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2C2C31.toInt() }
     private val path = Path()
@@ -54,7 +54,11 @@ class AnimTile(ctx: Context, private val pic: Bitmap?, private val mode: Int, pr
                 // the picture is drawn centred and scaled, so the clip is applied in the same space
                 canvas.clipPath(mp)
             }
-            canvas.drawBitmap(pic, null, RectF(-w / 2f, -h / 2f, w / 2f, h / 2f), paint)
+            if (fit) {
+                val k = minOf(w * 0.84f / pic.width, h * 0.84f / pic.height)
+                val pw = pic.width * k; val ph = pic.height * k
+                canvas.drawBitmap(pic, null, RectF(-pw / 2f, -ph / 2f, pw / 2f, ph / 2f), paint)
+            } else canvas.drawBitmap(pic, null, RectF(-w / 2f, -h / 2f, w / 2f, h / 2f), paint)
             canvas.restore()
         }
         canvas.restore()

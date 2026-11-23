@@ -27,9 +27,29 @@ import kotlin.math.min
 object OverlayRenderer {
     private val imageCache = HashMap<String, Bitmap?>()
 
-    fun render(ctx: Context, c: Clip, videoW: Int, videoH: Int): Bitmap? {
+    fun isGif(c: Clip) = c.kind == LaneKind.OVERLAY && c.uri.endsWith(".gif")
+
+    fun render(ctx: Context, c: Clip, videoW: Int, videoH: Int, tMs: Long = 0L): Bitmap? {
         if (videoW <= 0 || videoH <= 0) return null
-        return if (c.kind == LaneKind.OVERLAY) renderImage(ctx, c, videoW) else renderText(c, videoW, videoH)
+        return if (c.kind == LaneKind.OVERLAY) renderImage(ctx, c, videoW, tMs) else renderText(c, videoW, videoH)
+    }
+
+    private val movies = HashMap<String, android.graphics.Movie?>()
+
+    /** One frame of an animated GIF sticker at time [tMs] (loops). */
+    private fun gifFrame(c: Clip, w: Int, tMs: Long): Bitmap? {
+        val mv = movies.getOrPut(c.uri) {
+            try { android.graphics.Movie.decodeFile(Uri.parse(c.uri).path) } catch (_: Throwable) { null }
+        } ?: return null
+        if (mv.width() <= 0 || mv.height() <= 0) return null
+        val h = max(8, (w * mv.height().toFloat() / mv.width()).toInt())
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val cv = Canvas(bmp)
+        cv.scale(w.toFloat() / mv.width(), h.toFloat() / mv.height())
+        val d = mv.duration()
+        mv.setTime(if (d > 0) (tMs % d).toInt().coerceAtLeast(0) else 0)
+        mv.draw(cv, 0f, 0f)
+        return tilted(bmp, c.tilt)
     }
 
     private fun typefaceOf(c: Clip): android.graphics.Typeface {
@@ -105,8 +125,9 @@ object OverlayRenderer {
         return tilted(bmp, c.tilt)
     }
 
-    private fun renderImage(ctx: Context, c: Clip, videoW: Int): Bitmap? {
+    private fun renderImage(ctx: Context, c: Clip, videoW: Int, tMs: Long): Bitmap? {
         val w = max(8, (c.sizeFrac * videoW).toInt())
+        if (c.uri.endsWith(".gif")) return gifFrame(c, w, tMs)
         if (c.uri.startsWith("sticker:")) {
             val st = StickerArt.byId(c.uri.removePrefix("sticker:")) ?: return null
             return tilted(StickerArt.render(st, w), c.tilt)
@@ -129,6 +150,7 @@ class TimedOverlay(private val ctx: Context, private val clip: Clip, private val
     private var videoW = 0
     private var videoH = 0
     private var bmp: Bitmap? = null
+    private var lastFrame = -1L
     private val settings: OverlaySettings = OverlaySettings.Builder()
         .setBackgroundFrameAnchor(clip.posX * 2f - 1f, 1f - clip.posY * 2f)
         .build()
@@ -141,6 +163,12 @@ class TimedOverlay(private val ctx: Context, private val clip: Clip, private val
 
     override fun getBitmap(presentationTimeUs: Long): Bitmap {
         if (presentationTimeUs < startUs || presentationTimeUs >= endUs) return empty
+        if (OverlayRenderer.isGif(clip)) {
+            val t = (presentationTimeUs - startUs) / 1000L
+            val fi = t / 40L
+            if (fi != lastFrame || bmp == null) { bmp = OverlayRenderer.render(ctx, clip, videoW, videoH, t); lastFrame = fi }
+            return bmp ?: empty
+        }
         val b = bmp ?: OverlayRenderer.render(ctx, clip, videoW, videoH)?.also { bmp = it }
         return b ?: empty
     }
@@ -198,9 +226,10 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
     }
 
     private fun bitmapFor(c: Clip, r: RectF): Bitmap? {
-        val key = "${c.id}|${c.text}|${c.color}|${c.sizeFrac}|${c.bold}|${c.font}|${c.italic}|${c.strokeColor}|${c.strokeW}|${c.bgColor}|${c.shadow}|${c.textFx}|${c.tilt}|${c.uri}|${r.width().toInt()}x${r.height().toInt()}"
+        val t = if (OverlayRenderer.isGif(c)) max(0L, playheadMs - c.startMs) else 0L
+        val key = "${t / 40L}|${c.id}|${c.text}|${c.color}|${c.sizeFrac}|${c.bold}|${c.font}|${c.italic}|${c.strokeColor}|${c.strokeW}|${c.bgColor}|${c.shadow}|${c.textFx}|${c.tilt}|${c.uri}|${r.width().toInt()}x${r.height().toInt()}"
         if (cache.size > 40) cache.clear()
-        return cache.getOrPut(key) { OverlayRenderer.render(context, c, r.width().toInt(), r.height().toInt()) }
+        return cache.getOrPut(key) { OverlayRenderer.render(context, c, r.width().toInt(), r.height().toInt(), t) }
     }
 
     private fun boundsOf(c: Clip, r: RectF): RectF? {

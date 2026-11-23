@@ -72,6 +72,14 @@ object StickerArt {
 
     fun byId(id: String): Sticker? = ALL.firstOrNull { it.id == id }
 
+    /** Looping animation (Anim combo id) a sticker gets when it is added, so the panel tiles and the video move like CapCut's. */
+    private val ANIM = mapOf(
+        "sub" to 101, "subbell" to 103, "like" to 101, "follow" to 101, "share" to 105, "new" to 110, "hot" to 106, "live" to 111,
+        "star" to 109, "burst" to 101, "heart" to 102, "heartp" to 102, "redheart" to 102, "sparkHeart" to 102, "arrowR" to 105,
+        "arrowY" to 105, "arrowG" to 105, "arrowW" to 105, "skull" to 110, "fire" to 106, "100" to 101, "party" to 106, "rocket" to 105
+    )
+    fun animOf(id: String): Int = ANIM[id] ?: 0
+
     /** Draws a sticker into a bitmap [w] pixels wide. */
     fun render(s: Sticker, w: Int): Bitmap {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
