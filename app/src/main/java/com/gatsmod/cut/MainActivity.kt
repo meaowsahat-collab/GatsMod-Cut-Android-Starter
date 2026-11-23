@@ -1791,9 +1791,9 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
         val groups = listOf(
-            "Video effects" to listOf("None", "Glitch", "Pixelate", "Wave", "Sharpen"),
-            "Body effects" to listOf("Glow", "Wave", "Glitch", "Pixelate", "Mirror"),
-            "Style effects" to listOf("Vignette", "Film grain", "Scanlines", "Poster", "Mirror")
+            "Video effects" to listOf("None", "Glitch", "Pixelate", "Wave", "Sharpen", "Flash", "Kinetic Shots", "Rotating Earth", "Light Trails", "Explosion", "Super-large", "Blur TV"),
+            "Body effects" to listOf("Glow", "Wave", "Glitch", "Pixelate", "Mirror", "Flash"),
+            "Style" to listOf("Vignette", "Film grain", "Scanlines", "Poster", "Mirror", "Sharpen")
         )
         var selectedGroup = 0
         fun rebuild() {
@@ -1818,25 +1818,23 @@ class MainActivity : AppCompatActivity() {
                     grid.addView(current, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(86)))
                 }
                 val effectIndex = GlFxNames.EFFECTS.indexOf(name).coerceAtLeast(0)
-                val tile = TextView(this).apply {
-                    text = name
-                    textSize = 12f
-                    gravity = Gravity.CENTER
-                    setPadding(dp(5), dp(5), dp(5), dp(5))
-                    setTextColor(if (c.fx == effectIndex) CYAN else Color.WHITE)
+                val tile = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                    setPadding(dp(4), dp(5), dp(4), dp(4))
                     background = GradientDrawable().apply {
                         cornerRadius = dp(10).toFloat()
                         setColor(0xFF292932.toInt())
                         setStroke(dp(1), if (c.fx == effectIndex) CYAN else 0xFF44444C.toInt())
                     }
-                    setOnClickListener {
-                        c.fx = effectIndex
-                        intensity.progress = (c.fxAmount * 100).toInt()
-                        live()
-                        rebuild()
+                    val art = TextView(this@MainActivity).apply {
+                        text = when(name) { "None" -> "⊘"; "Glitch" -> "▥"; "Pixelate" -> "▦"; "Wave" -> "〰"; "Sharpen" -> "✧"; "Flash" -> "⚡"; "Kinetic Shots" -> "◈"; "Rotating Earth" -> "🌐"; "Light Trails" -> "✦"; "Explosion" -> "✹"; "Super-large" -> "⬆"; "Blur TV" -> "▣"; "Glow" -> "✴"; "Mirror" -> "◐"; "Vignette" -> "◉"; "Film grain" -> "░"; "Scanlines" -> "▤"; "Poster" -> "▰"; else -> "✦" }
+                        textSize = 28f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
                     }
+                    addView(art, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
+                    addView(TextView(this@MainActivity).apply { text = name; textSize = 11f; gravity = Gravity.CENTER; setTextColor(if (c.fx == effectIndex) CYAN else Color.WHITE) })
+                    setOnClickListener { c.fx = effectIndex; intensity.progress = (c.fxAmount * 100).toInt(); live(); rebuild() }
                 }
-                current?.addView(tile, LinearLayout.LayoutParams(0, dp(72), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
+                current?.addView(tile, LinearLayout.LayoutParams(0, dp(82), 1f).apply { setMargins(dp(4), dp(4), dp(4), dp(4)) })
             }
             current?.let { while (it.childCount < 3) it.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f)) }
             if (selectedGroup == 1) {
