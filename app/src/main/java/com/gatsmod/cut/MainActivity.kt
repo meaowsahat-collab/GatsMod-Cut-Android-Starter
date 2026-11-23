@@ -1770,7 +1770,7 @@ class MainActivity : AppCompatActivity() {
         val before = c.paramSig()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(4), dp(8), dp(4)) }
         val search = EditText(this).apply {
-            hint = "Search video effects"; textSize = 14f; singleLine = true
+            hint = "Search video effects"; textSize = 14f; isSingleLine = true
             setPadding(dp(14), dp(10), dp(14), dp(10))
             background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(0xFF34343B.toInt()) }
         }
