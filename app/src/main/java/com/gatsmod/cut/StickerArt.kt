@@ -21,55 +21,6 @@ object StickerArt {
     private fun e(id: String, cat: String, g: String, tags: String) = Sticker(id, cat, "emoji", tags.substringBefore(' '), g, tags = tags)
     private fun b(id: String, text: String, g: String, c1: Long, c2: Long, tags: String = "", cat: String = "HOT") = Sticker(id, cat, "badge", text, g, c1.toInt(), c2.toInt(), tags)
 
-    val ALL: List<Sticker> = listOf(
-        b("sub", "SUBSCRIBE", "", 0xFFE53935, 0xFFB71C1C, "youtube subscribe"),
-        b("subbell", "SUBSCRIBE", "🔔", 0xFFE53935, 0xFFFF7043, "subscribe bell notification"),
-        b("subd", "SUBSCRIBED", "✓", 0xFF424242, 0xFF212121, "subscribed done"),
-        b("share", "SHARE", "➦", 0xFF1E88E5, 0xFF1565C0, "share"),
-        b("like", "Like", "👍", 0xFF7C4DFF, 0xFF00B0FF, "like thumbs up"),
-        b("follow", "FOLLOW", "＋", 0xFF111111, 0xFF2C2C2C, "follow instagram tiktok"),
-        b("comment", "COMMENT", "💬", 0xFF43A047, 0xFF1B5E20, "comment"),
-        b("new", "NEW", "★", 0xFFFF1744, 0xFFD50000, "new"),
-        b("hot", "HOT", "🔥", 0xFFFF6D00, 0xFFDD2C00, "hot fire"),
-        b("live", "LIVE", "●", 0xFFE53935, 0xFFB71C1C, "live"),
-        b("sale", "SALE", "%", 0xFFFFD600, 0xFFFF8F00, "sale discount"),
-        b("bf", "BLACK FRIDAY", "", 0xFF212121, 0xFF000000, "black friday sale"),
-        Sticker("thanks", "HOT", "banner", "Thanks for watching", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFF222222.toInt(), tags = "thanks watching"),
-        Sticker("likebanner", "HOT", "banner", "LIKE 👍", c1 = 0xFFFFEB3B.toInt(), c2 = 0xFFFF1744.toInt(), tags = "like banner"),
-        Sticker("omg", "Text", "banner", "OMG!", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFFFF1744.toInt(), tags = "omg wow"),
-        Sticker("wow", "Text", "banner", "WOW", c1 = 0xFFFFEB3B.toInt(), c2 = 0xFF6A1B9A.toInt(), tags = "wow"),
-        Sticker("lol", "Text", "banner", "LOL", c1 = 0xFF00E676.toInt(), c2 = 0xFF004D40.toInt(), tags = "lol funny"),
-        Sticker("cool", "Text", "banner", "COOL", c1 = 0xFF40C4FF.toInt(), c2 = 0xFF01579B.toInt(), tags = "cool"),
-        Sticker("part1", "Text", "banner", "PART 1", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFF3949AB.toInt(), tags = "part one series"),
-        Sticker("vs", "Text", "banner", "VS", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFFD50000.toInt(), tags = "versus vs"),
-        Sticker("arrowR", "Arrows", "arrow", "Arrow", c1 = 0xFFFF1744.toInt(), tags = "arrow red right"),
-        Sticker("arrowY", "Arrows", "arrow", "Arrow yellow", c1 = 0xFFFFD600.toInt(), tags = "arrow yellow"),
-        Sticker("arrowG", "Arrows", "arrow", "Arrow green", c1 = 0xFF00E676.toInt(), tags = "arrow green"),
-        Sticker("arrowW", "Arrows", "arrow", "Arrow white", c1 = 0xFFFFFFFF.toInt(), tags = "arrow white"),
-        Sticker("star", "Shapes", "shape", "Star", "star", 0xFFFFD600.toInt(), 0xFFFF8F00.toInt(), "star"),
-        Sticker("heart", "Love", "shape", "Heart", "heart", 0xFFFF1744.toInt(), 0xFFD50000.toInt(), "heart love"),
-        Sticker("heartp", "Love", "shape", "Pink heart", "heart", 0xFFFF80AB.toInt(), 0xFFF50057.toInt(), "heart pink love"),
-        Sticker("burst", "Shapes", "shape", "Burst", "burst", 0xFFFFEB3B.toInt(), 0xFFFF6D00.toInt(), "burst explosion"),
-        Sticker("circle", "Shapes", "shape", "Circle", "circle", 0xFF40C4FF.toInt(), 0xFF0091EA.toInt(), "circle"),
-        Sticker("square", "Shapes", "shape", "Box", "square", 0xFFFFFFFF.toInt(), 0xFFBDBDBD.toInt(), "box square white"),
-        Sticker("black", "Shapes", "shape", "Black bar", "bar", 0xFF000000.toInt(), 0xFF000000.toInt(), "black bar censor"),
-        Sticker("ring", "Shapes", "shape", "Ring", "ring", 0xFFFF1744.toInt(), 0xFFFF1744.toInt(), "ring circle highlight")
-    ) + listOf(
-        e("skull", "HOT", "💀", "skull dead"), e("fire", "HOT", "🔥", "fire hot"), e("100", "HOT", "💯", "100 hundred"),
-        e("crown", "HOT", "👑", "crown king"), e("rocket", "HOT", "🚀", "rocket"),
-        e("laugh", "Emoji", "😂", "laugh funny"), e("grin", "Emoji", "😀", "smile happy"), e("heartEyes", "Emoji", "😍", "love eyes"),
-        e("cool2", "Emoji", "😎", "cool sunglasses"), e("cry", "Emoji", "😭", "cry sad"), e("angry", "Emoji", "😡", "angry"),
-        e("think", "Emoji", "🤔", "think"), e("shock", "Emoji", "😱", "shock scream"), e("wink", "Emoji", "😉", "wink"),
-        e("clown", "Emoji", "🤡", "clown"), e("ghost", "Emoji", "👻", "ghost"), e("alien", "Emoji", "👽", "alien"),
-        e("thumb", "Emoji", "👍", "thumb like"), e("clap", "Emoji", "👏", "clap"), e("pray", "Emoji", "🙏", "pray thanks"),
-        e("eyes", "Emoji", "👀", "eyes look"), e("muscle", "Emoji", "💪", "strong muscle"),
-        e("redheart", "Love", "❤️", "heart love red"), e("broken", "Love", "💔", "broken heart"), e("kiss", "Love", "😘", "kiss"),
-        e("hug", "Love", "🥰", "love hug"), e("sparkHeart", "Love", "💖", "sparkle heart"), e("rose", "Love", "🌹", "rose flower"),
-        e("party", "Party", "🎉", "party confetti"), e("balloon", "Party", "🎈", "balloon"), e("gift", "Party", "🎁", "gift"),
-        e("cake", "Party", "🎂", "cake birthday"), e("trophy", "Party", "🏆", "trophy win"), e("music", "Party", "🎵", "music note"),
-        e("sparkle", "Party", "✨", "sparkle"), e("rainbow", "Party", "🌈", "rainbow"), e("starE", "Party", "⭐", "star")
-    ) + EXTRA
-
     private val EXTRA: List<Sticker> = listOf(
         b("cta1", "SUBSCRIBE", "🔔", 0xFFE53935, 0xFFB71C1C, "Sub Red SUBSCRIBE 🔔", "Social & CTA"),
         b("cta2", "SUBSCRIBE", "▶", 0xFFE53935, 0xFFB71C1C, "Sub Pill SUBSCRIBE ▶", "Social & CTA"),
@@ -223,6 +174,57 @@ object StickerArt {
         e("fun30", "Fun & Gaming", "🎉", "gaming fun lifestyle 🎉")
     )
 
+
+    val ALL: List<Sticker> = listOf(
+        b("sub", "SUBSCRIBE", "", 0xFFE53935, 0xFFB71C1C, "youtube subscribe"),
+        b("subbell", "SUBSCRIBE", "🔔", 0xFFE53935, 0xFFFF7043, "subscribe bell notification"),
+        b("subd", "SUBSCRIBED", "✓", 0xFF424242, 0xFF212121, "subscribed done"),
+        b("share", "SHARE", "➦", 0xFF1E88E5, 0xFF1565C0, "share"),
+        b("like", "Like", "👍", 0xFF7C4DFF, 0xFF00B0FF, "like thumbs up"),
+        b("follow", "FOLLOW", "＋", 0xFF111111, 0xFF2C2C2C, "follow instagram tiktok"),
+        b("comment", "COMMENT", "💬", 0xFF43A047, 0xFF1B5E20, "comment"),
+        b("new", "NEW", "★", 0xFFFF1744, 0xFFD50000, "new"),
+        b("hot", "HOT", "🔥", 0xFFFF6D00, 0xFFDD2C00, "hot fire"),
+        b("live", "LIVE", "●", 0xFFE53935, 0xFFB71C1C, "live"),
+        b("sale", "SALE", "%", 0xFFFFD600, 0xFFFF8F00, "sale discount"),
+        b("bf", "BLACK FRIDAY", "", 0xFF212121, 0xFF000000, "black friday sale"),
+        Sticker("thanks", "HOT", "banner", "Thanks for watching", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFF222222.toInt(), tags = "thanks watching"),
+        Sticker("likebanner", "HOT", "banner", "LIKE 👍", c1 = 0xFFFFEB3B.toInt(), c2 = 0xFFFF1744.toInt(), tags = "like banner"),
+        Sticker("omg", "Text", "banner", "OMG!", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFFFF1744.toInt(), tags = "omg wow"),
+        Sticker("wow", "Text", "banner", "WOW", c1 = 0xFFFFEB3B.toInt(), c2 = 0xFF6A1B9A.toInt(), tags = "wow"),
+        Sticker("lol", "Text", "banner", "LOL", c1 = 0xFF00E676.toInt(), c2 = 0xFF004D40.toInt(), tags = "lol funny"),
+        Sticker("cool", "Text", "banner", "COOL", c1 = 0xFF40C4FF.toInt(), c2 = 0xFF01579B.toInt(), tags = "cool"),
+        Sticker("part1", "Text", "banner", "PART 1", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFF3949AB.toInt(), tags = "part one series"),
+        Sticker("vs", "Text", "banner", "VS", c1 = 0xFFFFFFFF.toInt(), c2 = 0xFFD50000.toInt(), tags = "versus vs"),
+        Sticker("arrowR", "Arrows", "arrow", "Arrow", c1 = 0xFFFF1744.toInt(), tags = "arrow red right"),
+        Sticker("arrowY", "Arrows", "arrow", "Arrow yellow", c1 = 0xFFFFD600.toInt(), tags = "arrow yellow"),
+        Sticker("arrowG", "Arrows", "arrow", "Arrow green", c1 = 0xFF00E676.toInt(), tags = "arrow green"),
+        Sticker("arrowW", "Arrows", "arrow", "Arrow white", c1 = 0xFFFFFFFF.toInt(), tags = "arrow white"),
+        Sticker("star", "Shapes", "shape", "Star", "star", 0xFFFFD600.toInt(), 0xFFFF8F00.toInt(), "star"),
+        Sticker("heart", "Love", "shape", "Heart", "heart", 0xFFFF1744.toInt(), 0xFFD50000.toInt(), "heart love"),
+        Sticker("heartp", "Love", "shape", "Pink heart", "heart", 0xFFFF80AB.toInt(), 0xFFF50057.toInt(), "heart pink love"),
+        Sticker("burst", "Shapes", "shape", "Burst", "burst", 0xFFFFEB3B.toInt(), 0xFFFF6D00.toInt(), "burst explosion"),
+        Sticker("circle", "Shapes", "shape", "Circle", "circle", 0xFF40C4FF.toInt(), 0xFF0091EA.toInt(), "circle"),
+        Sticker("square", "Shapes", "shape", "Box", "square", 0xFFFFFFFF.toInt(), 0xFFBDBDBD.toInt(), "box square white"),
+        Sticker("black", "Shapes", "shape", "Black bar", "bar", 0xFF000000.toInt(), 0xFF000000.toInt(), "black bar censor"),
+        Sticker("ring", "Shapes", "shape", "Ring", "ring", 0xFFFF1744.toInt(), 0xFFFF1744.toInt(), "ring circle highlight")
+    ) + listOf(
+        e("skull", "HOT", "💀", "skull dead"), e("fire", "HOT", "🔥", "fire hot"), e("100", "HOT", "💯", "100 hundred"),
+        e("crown", "HOT", "👑", "crown king"), e("rocket", "HOT", "🚀", "rocket"),
+        e("laugh", "Emoji", "😂", "laugh funny"), e("grin", "Emoji", "😀", "smile happy"), e("heartEyes", "Emoji", "😍", "love eyes"),
+        e("cool2", "Emoji", "😎", "cool sunglasses"), e("cry", "Emoji", "😭", "cry sad"), e("angry", "Emoji", "😡", "angry"),
+        e("think", "Emoji", "🤔", "think"), e("shock", "Emoji", "😱", "shock scream"), e("wink", "Emoji", "😉", "wink"),
+        e("clown", "Emoji", "🤡", "clown"), e("ghost", "Emoji", "👻", "ghost"), e("alien", "Emoji", "👽", "alien"),
+        e("thumb", "Emoji", "👍", "thumb like"), e("clap", "Emoji", "👏", "clap"), e("pray", "Emoji", "🙏", "pray thanks"),
+        e("eyes", "Emoji", "👀", "eyes look"), e("muscle", "Emoji", "💪", "strong muscle"),
+        e("redheart", "Love", "❤️", "heart love red"), e("broken", "Love", "💔", "broken heart"), e("kiss", "Love", "😘", "kiss"),
+        e("hug", "Love", "🥰", "love hug"), e("sparkHeart", "Love", "💖", "sparkle heart"), e("rose", "Love", "🌹", "rose flower"),
+        e("party", "Party", "🎉", "party confetti"), e("balloon", "Party", "🎈", "balloon"), e("gift", "Party", "🎁", "gift"),
+        e("cake", "Party", "🎂", "cake birthday"), e("trophy", "Party", "🏆", "trophy win"), e("music", "Party", "🎵", "music note"),
+        e("sparkle", "Party", "✨", "sparkle"), e("rainbow", "Party", "🌈", "rainbow"), e("starE", "Party", "⭐", "star")
+    ) + EXTRA
+
+
     fun byId(id: String): Sticker? = ALL.firstOrNull { it.id == id }
 
     /** Looping animation (Anim combo id) a sticker gets when it is added, so the panel tiles and the video move like CapCut's. */
@@ -231,7 +233,7 @@ object StickerArt {
         "star" to 109, "burst" to 101, "heart" to 102, "heartp" to 102, "redheart" to 102, "sparkHeart" to 102, "arrowR" to 105,
         "arrowY" to 105, "arrowG" to 105, "arrowW" to 105, "skull" to 110, "fire" to 106, "100" to 101, "party" to 106, "rocket" to 105
     )
-    fun animOf(id: String): Int = ANIM[id] ?: 0
+    fun animOf(id: String): Int = ANIM[id] ?: 101
 
     /** Draws a sticker into a bitmap [w] pixels wide. */
     fun render(s: Sticker, w: Int): Bitmap {
