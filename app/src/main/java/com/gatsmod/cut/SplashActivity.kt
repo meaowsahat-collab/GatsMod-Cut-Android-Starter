@@ -23,6 +23,10 @@ class SplashActivity : AppCompatActivity() {
         val bgColor = 0xFF4A4A4F.toInt()
         window.statusBarColor = bgColor
         window.navigationBarColor = bgColor
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
 
         val root = FrameLayout(this)
         root.setBackgroundColor(bgColor)
@@ -30,13 +34,16 @@ class SplashActivity : AppCompatActivity() {
         col.orientation = LinearLayout.VERTICAL
         col.gravity = Gravity.CENTER_HORIZONTAL
 
-        val tile = ImageView(this)
-        tile.setImageResource(R.drawable.ic_launcher_fg)
-        tile.scaleType = ImageView.ScaleType.FIT_CENTER
+        val tile = FrameLayout(this)
         val g = GradientDrawable()
         g.setColor(Color.WHITE)
         g.cornerRadius = dp(30).toFloat()
         tile.background = g
+        tile.clipToOutline = true
+        val img = ImageView(this)
+        img.setImageResource(R.drawable.ic_launcher_fg)
+        img.scaleType = ImageView.ScaleType.FIT_CENTER
+        tile.addView(img, FrameLayout.LayoutParams(dp(240), dp(240), Gravity.CENTER))
         col.addView(tile, LinearLayout.LayoutParams(dp(130), dp(130)))
 
         val name = TextView(this)
@@ -45,7 +52,8 @@ class SplashActivity : AppCompatActivity() {
         name.setTypeface(null, Typeface.BOLD)
         name.setTextColor(Color.WHITE)
         name.setPadding(0, dp(18), 0, 0)
-        col.addView(name)
+        name.gravity = Gravity.CENTER
+        col.addView(name, LinearLayout.LayoutParams(-2, -2))
 
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         setContentView(root)
