@@ -1791,8 +1791,8 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
         val groups = listOf(
-            "Video effects" to listOf("None", "Glitch", "Pixelate", "Wave", "Sharpen", "Flash", "Kinetic Shots", "Rotating Earth", "Light Trails", "Explosion", "Super-large", "Blur TV"),
-            "Body effects" to listOf("Glow", "Wave", "Glitch", "Pixelate", "Mirror", "Flash"),
+            "Video effects" to listOf("None", "Glitch", "Pixelate", "Wave", "Sharpen", "Glow", "Vignette", "Mirror", "Poster", "Film grain", "Scanlines"),
+            "Body effects" to listOf("Glow", "Wave", "Glitch", "Pixelate", "Mirror", "Sharpen"),
             "Style" to listOf("Vignette", "Film grain", "Scanlines", "Poster", "Mirror", "Sharpen")
         )
         var selectedGroup = 0
@@ -1827,7 +1827,7 @@ class MainActivity : AppCompatActivity() {
                         setStroke(dp(1), if (c.fx == effectIndex) CYAN else 0xFF44444C.toInt())
                     }
                     val art = TextView(this@MainActivity).apply {
-                        text = when(name) { "None" -> "⊘"; "Glitch" -> "▥"; "Pixelate" -> "▦"; "Wave" -> "〰"; "Sharpen" -> "✧"; "Flash" -> "⚡"; "Kinetic Shots" -> "◈"; "Rotating Earth" -> "🌐"; "Light Trails" -> "✦"; "Explosion" -> "✹"; "Super-large" -> "⬆"; "Blur TV" -> "▣"; "Glow" -> "✴"; "Mirror" -> "◐"; "Vignette" -> "◉"; "Film grain" -> "░"; "Scanlines" -> "▤"; "Poster" -> "▰"; else -> "✦" }
+                        text = when(name) { "None" -> "⊘"; "Glitch" -> "▥"; "Pixelate" -> "▦"; "Wave" -> "〰"; "Sharpen" -> "✧"; "Glow" -> "✴"; "Film grain" -> "░"; "Glow" -> "✴"; "Mirror" -> "◐"; "Vignette" -> "◉"; "Film grain" -> "░"; "Scanlines" -> "▤"; "Poster" -> "▰"; else -> "✦" }
                         textSize = 28f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
                     }
                     addView(art, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
