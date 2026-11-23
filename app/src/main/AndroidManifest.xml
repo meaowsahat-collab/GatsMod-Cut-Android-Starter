@@ -11,6 +11,9 @@
         android:theme="@style/Theme.GatsModCut">
         <activity
             android:name=".HomeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".SplashActivity"
             android:theme="@style/Theme.GatsModCut.Splash"
             android:exported="true">
             <intent-filter>
