@@ -20,6 +20,7 @@ import android.view.View
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlaySettings
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -28,10 +29,42 @@ object OverlayRenderer {
     private val imageCache = HashMap<String, Bitmap?>()
 
     fun isGif(c: Clip) = c.kind == LaneKind.OVERLAY && c.uri.endsWith(".gif")
+    /** True when the picture changes while the clip plays (GIF frames, typewriter text). */
+    fun isDynamic(c: Clip) = isGif(c) || (c.kind != LaneKind.OVERLAY && c.textReveal != 0 && abs(c.tilt) < 0.5f)
+
+    /** How many characters are visible at [tMs] for the reveal style. */
+    fun visibleChars(c: Clip, tMs: Long): Int {
+        val n = c.text.length
+        return when (c.textReveal) {
+            1 -> (tMs / 60L).toInt().coerceIn(0, n)
+            2 -> {
+                var words = (tMs / 320L).toInt() + 1
+                var i = 0
+                while (i < n && words > 0) {
+                    while (i < n && c.text[i].isWhitespace()) i++
+                    while (i < n && !c.text[i].isWhitespace()) i++
+                    words--
+                }
+                i
+            }
+            else -> n
+        }
+    }
+
+    private fun revealed(c: Clip, w: Int, h: Int, tMs: Long): Bitmap? {
+        val full = renderText(c, w, h) ?: return null
+        val n = visibleChars(c, tMs)
+        if (n >= c.text.length) return full
+        val out = Bitmap.createBitmap(full.width, full.height, Bitmap.Config.ARGB_8888)
+        if (n <= 0) return out
+        val part = renderText(c.copy(text = c.text.substring(0, n).trimEnd()), w, h) ?: return out
+        Canvas(out).drawBitmap(part, 0f, 0f, null)
+        return out
+    }
 
     fun render(ctx: Context, c: Clip, videoW: Int, videoH: Int, tMs: Long = 0L): Bitmap? {
         if (videoW <= 0 || videoH <= 0) return null
-        return if (c.kind == LaneKind.OVERLAY) renderImage(ctx, c, videoW, tMs) else renderText(c, videoW, videoH)
+        return if (c.kind == LaneKind.OVERLAY) renderImage(ctx, c, videoW, tMs) else if (isDynamic(c)) revealed(c, videoW, videoH, tMs) else renderText(c, videoW, videoH)
     }
 
     private val movies = HashMap<String, android.graphics.Movie?>()
@@ -186,7 +219,7 @@ class TimedOverlay(private val ctx: Context, private val clip: Clip, private val
 
     override fun getBitmap(presentationTimeUs: Long): Bitmap {
         if (presentationTimeUs < startUs || presentationTimeUs >= endUs) return empty
-        if (OverlayRenderer.isGif(clip)) {
+        if (OverlayRenderer.isDynamic(clip)) {
             val t = (presentationTimeUs - startUs) / 1000L
             val fi = t / 40L
             if (fi != lastFrame || bmp == null) { bmp = OverlayRenderer.render(ctx, clip, videoW, videoH, t); lastFrame = fi }
@@ -249,8 +282,8 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
     }
 
     private fun bitmapFor(c: Clip, r: RectF): Bitmap? {
-        val t = if (OverlayRenderer.isGif(c)) max(0L, playheadMs - c.startMs) else 0L
-        val key = "${t / 40L}|${c.id}|${c.text}|${c.color}|${c.sizeFrac}|${c.bold}|${c.font}|${c.italic}|${c.strokeColor}|${c.strokeW}|${c.bgColor}|${c.shadow}|${c.textFx}|${c.tilt}|${c.uri}|${r.width().toInt()}x${r.height().toInt()}"
+        val t = if (OverlayRenderer.isDynamic(c)) max(0L, playheadMs - c.startMs) else 0L
+        val key = "${t / 40L}|${c.textReveal}|${c.id}|${c.text}|${c.color}|${c.sizeFrac}|${c.bold}|${c.font}|${c.italic}|${c.strokeColor}|${c.strokeW}|${c.bgColor}|${c.shadow}|${c.textFx}|${c.tilt}|${c.uri}|${r.width().toInt()}x${r.height().toInt()}"
         if (cache.size > 40) cache.clear()
         return cache.getOrPut(key) { OverlayRenderer.render(context, c, r.width().toInt(), r.height().toInt(), t) }
     }

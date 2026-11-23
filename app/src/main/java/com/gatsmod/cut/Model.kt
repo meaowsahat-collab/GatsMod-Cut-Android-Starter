@@ -91,7 +91,8 @@ data class Clip(
     var italic: Boolean = false,
     var textFx: Int = 0,
     var tilt: Float = 0f,
-    var textMotion: Int = 0
+    var textMotion: Int = 0,
+    var textReveal: Int = 0
 ) {
     val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0 || textMotion != 0
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO

@@ -33,6 +33,7 @@ class AnimTile(ctx: Context, private val pic: Bitmap?, private val mode: Int, pr
         when (mode) {
             0 -> { val t = now % 1900L; pose = Anim.pose(id, 800, 0, 0, 0, t, 1900); mask = Anim.maskState(id, 800, 0, 0, t, 1900) }
             1 -> { val t = now % 1900L; pose = Anim.pose(0, 0, id, 800, 0, t, 1900); mask = Anim.maskState(0, 0, id, 800, t, 1900) }
+            3 -> pose = ProText.pose(id, now % 100000L)
             else -> pose = Anim.pose(0, 0, 0, 0, id, now % 3000L, 3000)
         }
         if (pic != null) {

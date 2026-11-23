@@ -2476,7 +2476,9 @@ class MainActivity : AppCompatActivity() {
                         for (i in 0 until ProText.COUNT) {
                             val probe = clip.deepCopy(-1L); ProText.apply(probe, i); probe.textMotion = 0
                             val on = clip.textMotion == i / 5 + 1 && clip.textFx == 10 + i % 5
-                            g.addView(gridCell(tileW, pictureCell(styleSample(probe, "TEXT")), ProText.title(i), on) {
+                            val samp = styleSample(probe, "TEXT")
+                            val cellView: View = if (samp != null) AnimTile(this, samp, 3, i / 5 + 1, 0f, true) else View(this)
+                            g.addView(gridCell(tileW, cellView, ProText.title(i), on) {
                                 ProText.apply(clip, i)
                                 changed(); fill()
                             })
@@ -2488,6 +2490,13 @@ class MainActivity : AppCompatActivity() {
                     none.setTextColor(0xFF8E8E93.toInt())
                     none.setPadding(dp(6), 0, 0, dp(6))
                     content.addView(none)
+                    val rv = TextView(this)
+                    rv.text = "Letter / word reveal (best for one line of text, not with tilt)"
+                    rv.textSize = 12f
+                    rv.setTextColor(0xFF8E8E93.toInt())
+                    rv.setPadding(dp(6), dp(4), 0, dp(4))
+                    content.addView(rv)
+                    content.addView(chips(listOf("None", "Typewriter", "Word by word"), clip.textReveal) { clip.textReveal = it; changed() })
                     content.addView(button("Remove pro animation") { clip.textMotion = 0; if (clip.textFx >= 10) clip.textFx = 0; changed(); fill() })
                     content.addView(g)
                     fill()
