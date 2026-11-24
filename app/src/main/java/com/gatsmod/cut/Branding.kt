@@ -91,21 +91,36 @@ class WatermarkOverlay(private val bmp: Bitmap, pos: Int, alphaPercent: Int) : B
 object EndingCard {
     const val LABEL = "Ending"
 
-    fun make(ctx: Context, text: String, aspect: Float, progress: (Int) -> Boolean): FrameVideo.Result? {
+    fun file(ctx: Context, text: String, aspect: Float) = File(File(ctx.filesDir, "endings"), "e_${text.hashCode()}_${(aspect * 100).toInt()}.mp4")
+
+    /** The finished card if it was made before (then adding the ending is instant), else null. */
+    fun cached(ctx: Context, text: String, aspect: Float): FrameVideo.Result? {
+        val f = file(ctx, text, aspect)
+        if (!f.exists() || f.length() < 1000L) return null
+        val (w, h) = size(aspect)
+        return FrameVideo.Result(f, 2500L, w, h)
+    }
+
+    private fun size(aspect: Float): Pair<Int, Int> {
         val short = 720
-        val w: Int; val h: Int
-        if (aspect >= 1f) { h = short; w = (short * aspect).toInt() } else { w = short; h = (short / aspect).toInt() }
+        return if (aspect >= 1f) Pair((short * aspect).toInt() / 2 * 2, short) else Pair(short, (short / aspect).toInt() / 2 * 2)
+    }
+
+    fun make(ctx: Context, text: String, aspect: Float, progress: (Int) -> Boolean): FrameVideo.Result? {
+        cached(ctx, text, aspect)?.let { return it }
+        val (w, h) = size(aspect)
         val fps = 30
         val total = 75
         val logo = ContextCompat.getDrawable(ctx, R.drawable.ic_launcher_fg)
-        val out = File(File(ctx.filesDir, "reversed"), "E_" + System.currentTimeMillis() + ".mp4")
+        val finalFile = file(ctx, text, aspect)
+        val out = File(finalFile.path + ".tmp")
         val tile = min(w, h) * 0.3f
         val tp = Paint(Paint.ANTI_ALIAS_FLAG)
         tp.typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
         tp.textAlign = Paint.Align.CENTER
         tp.textSize = min(w, h) * 0.058f
         val lines = wrap(text.ifBlank { "Made with Get Cut" }, tp, w * 0.84f)
-        return FrameVideo.write(out, fps, total, 3_000_000, { i ->
+        val res = FrameVideo.write(out, fps, total, 3_000_000, { i ->
             val t = i / fps.toFloat()
             val a = (t / 0.7f).coerceIn(0f, 1f)
             val ease = 1f - (1f - a) * (1f - a)
@@ -133,7 +148,9 @@ object EndingCard {
             var y = top + tile + tile * 0.18f + tp.textSize
             for (ln in lines) { cv.drawText(ln, cx, y, tp); y += tp.textSize * 1.4f }
             bmp
-        }, progress)
+        }, progress) ?: return null
+        finalFile.delete()
+        return if (out.renameTo(finalFile)) FrameVideo.Result(finalFile, res.durationMs, res.width, res.height) else res
     }
 
     private fun wrap(t: String, p: Paint, maxW: Float): List<String> {

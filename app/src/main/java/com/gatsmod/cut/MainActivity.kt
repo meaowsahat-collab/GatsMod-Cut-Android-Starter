@@ -403,7 +403,7 @@ class MainActivity : AppCompatActivity() {
                 engine.refresh()
                 if (first) engine.seekTo(0)
                 syncUi()
-                if (first && Branding.endingOn(this)) ui.postDelayed({ addEnding() }, 300)
+                if (first && Branding.endingOn(this)) ui.postDelayed({ addEnding(true) }, 300)
             }
         }.start()
     }
@@ -1040,23 +1040,35 @@ class MainActivity : AppCompatActivity() {
 
     private fun endingAspect(): Float { val sz = exporter.outputSize(project, 720); return sz.width / sz.height.toFloat() }
 
-    private fun addEnding() {
-        if (project.isEmpty()) { toast("Import a video first"); return }
-        if (project.main.any { it.label == EndingCard.LABEL }) { toast("The video already has an ending - tap it to change the text"); return }
+    private fun endingClip(res: FrameVideo.Result) = Clip(
+        id = project.newId(), kind = LaneKind.VIDEO, uri = Uri.fromFile(res.file).toString(),
+        srcInMs = 0, srcOutMs = res.durationMs, srcTotalMs = res.durationMs, label = EndingCard.LABEL,
+        width = res.width, height = res.height, hasAudio = false, fps = 30f
+    )
+
+    /** [auto] = silent: no progress window, the card is made in the background and only reused afterwards. */
+    private fun addEnding(auto: Boolean = false) {
+        if (project.isEmpty()) { if (!auto) toast("Import a video first"); return }
+        if (project.main.any { it.label == EndingCard.LABEL }) { if (!auto) toast("The video already has an ending - tap it to change the text"); return }
         val text = Branding.endingText(this)
         val aspect = endingAspect()
+        fun put(res: FrameVideo.Result) {
+            if (project.main.any { it.label == EndingCard.LABEL }) return
+            project.addMain(endingClip(res))
+            engine.refresh()
+            syncUi()
+        }
+        EndingCard.cached(this, text, aspect)?.let { put(it); return }
+        if (auto) {
+            Thread {
+                val res = EndingCard.make(this, text, aspect) { true }
+                if (res != null) runOnUiThread { put(res) }
+            }.start()
+            return
+        }
         runWork("Making ending") { progress ->
             val res = EndingCard.make(this, text, aspect, progress) ?: return@runWork null
-            return@runWork {
-                val c = Clip(
-                    id = project.newId(), kind = LaneKind.VIDEO, uri = Uri.fromFile(res.file).toString(),
-                    srcInMs = 0, srcOutMs = res.durationMs, srcTotalMs = res.durationMs, label = EndingCard.LABEL,
-                    width = res.width, height = res.height, hasAudio = false, fps = 30f
-                )
-                project.addMain(c)
-                engine.refresh()
-                syncUi()
-            }
+            return@runWork { put(res) }
         }
     }
 
