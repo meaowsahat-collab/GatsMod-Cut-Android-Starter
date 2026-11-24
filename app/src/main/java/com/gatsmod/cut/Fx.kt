@@ -86,7 +86,7 @@ object Fx {
     val FONT_NAMES = listOf("Sans", "Serif", "Mono", "Cursive", "Condensed", "Casual", "Black", "Light", "Medium", "Thin")
 
     /** Rotate/flip, crop, chroma key, colour adjustments, filter preset and blur for one clip. */
-    fun lookEffects(c: Clip): List<Effect> {
+    fun lookEffects(c: Clip, live: Boolean = false): List<Effect> {
         val l = mutableListOf<Effect>()
         if (c.rotation % 360 != 0 || c.flipH || c.flipV) {
             l.add(
@@ -98,13 +98,14 @@ object Fx {
         }
         if (c.cropRatio > 0f) l.add(AspectCrop(c.cropRatio))
         if (c.chroma.enabled) l.add(ChromaLut.create(c.chroma))
-        if (abs(c.brightness) > 0.001f) l.add(Brightness(c.brightness.coerceIn(-1f, 1f)))
-        if (abs(c.contrast - 1f) > 0.001f) l.add(Contrast((c.contrast - 1f).coerceIn(-1f, 1f)))
-        if (abs(c.temp) > 0.01f) {
+        if (live) l.add(LiveColorEffect(c))
+        if (!live && abs(c.brightness) > 0.001f) l.add(Brightness(c.brightness.coerceIn(-1f, 1f)))
+        if (!live && abs(c.contrast - 1f) > 0.001f) l.add(Contrast((c.contrast - 1f).coerceIn(-1f, 1f)))
+        if (!live && abs(c.temp) > 0.01f) {
             l.add(RgbAdjustment.Builder().setRedScale(1f + 0.25f * c.temp).setBlueScale(1f - 0.25f * c.temp).build())
         }
         val sat = (c.saturation - 1f) * 100f
-        if (abs(sat) > 0.1f || abs(c.hue) > 0.1f || abs(c.lum) > 0.1f) {
+        if (!live && (abs(sat) > 0.1f || abs(c.hue) > 0.1f || abs(c.lum) > 0.1f)) {
             l.add(
                 HslAdjustment.Builder()
                     .adjustHue(c.hue)
@@ -121,11 +122,12 @@ object Fx {
             if (fd.br != 0f) l.add(Brightness(fd.br))
             if (fd.r != 1f || fd.g != 1f || fd.b != 1f) l.add(RgbAdjustment.Builder().setRedScale(fd.r).setGreenScale(fd.g).setBlueScale(fd.b).build())
         }
-        if (c.exposure != 0f || c.tint != 0f) {
+        if (!live && (c.exposure != 0f || c.tint != 0f)) {
             val e = Math.pow(2.0, c.exposure.toDouble() * 0.8).toFloat()
             l.add(RgbAdjustment.Builder().setRedScale(e * (1f + 0.12f * c.tint)).setGreenScale(e * (1f - 0.2f * c.tint)).setBlueScale(e * (1f + 0.12f * c.tint)).build())
         }
-        if (c.highlights != 0f || c.shadows != 0f || c.vibrance != 0f || c.fade != 0f || c.sharpen != 0f || c.vignette != 0f || c.grain != 0f) {
+        if (live) l.add(ToneGlEffect({ floatArrayOf(c.highlights, c.shadows, c.vibrance, c.fade, c.sharpen, c.vignette, c.grain) }, true))
+        else if (c.highlights != 0f || c.shadows != 0f || c.vibrance != 0f || c.fade != 0f || c.sharpen != 0f || c.vignette != 0f || c.grain != 0f) {
             l.add(ToneGlEffect(floatArrayOf(c.highlights, c.shadows, c.vibrance, c.fade, c.sharpen, c.vignette, c.grain)))
         }
         if (c.blur > 0.1f) l.add(GaussianBlur(c.blur.coerceAtMost(25f)))
@@ -136,8 +138,8 @@ object Fx {
     }
 
     /** Effects for the live preview. [localMs] returns the playhead position inside this clip. */
-    fun previewEffects(c: Clip, localMs: () -> Long): List<Effect> {
-        val l = lookEffects(c).toMutableList()
+    fun previewEffects(c: Clip, live: Boolean = false, localMs: () -> Long): List<Effect> {
+        val l = lookEffects(c, live).toMutableList()
         if (c.stab.isNotEmpty()) l.add(KeyframeTransform(c.stab) { c.srcInMs + (localMs() * c.speed).toLong() })
         if (c.hasAnim) {
             if (Anim.isMask(c.animIn) || Anim.isMask(c.animOut)) {

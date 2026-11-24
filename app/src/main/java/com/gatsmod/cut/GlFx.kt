@@ -199,12 +199,112 @@ void main() {
 
 
 /** Highlights, shadows, vibrance, fade, sharpen, vignette and grain in one pass. [v] = [highlights, shadows, vibrance, fade, sharpen, vignette, grain], each -1..1 (fade, sharpen, grain 0..1). */
-class ToneGlEffect(private val v: FloatArray) : GlEffect {
-    override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = ToneProgram(v, useHdr)
-    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = v.all { it == 0f }
+class ToneGlEffect(private val src: () -> FloatArray, private val always: Boolean = false) : GlEffect {
+    constructor(v: FloatArray) : this({ v })
+    override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = ToneProgram(src, useHdr)
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = !always && src().all { it == 0f }
 }
 
-private class ToneProgram(private val v: FloatArray, useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
+/** Brightness, contrast, saturation, temperature, hue, lightness, exposure and tint in one pass that re-reads the clip's values on every frame, so sliders show their effect instantly while being dragged (preview only). */
+class LiveColorEffect(private val c: Clip) : GlEffect {
+    override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = LiveColorProgram(c, useHdr)
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = false
+}
+
+private class LiveColorProgram(private val c: Clip, useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
+    private val program: GlProgram
+
+    init {
+        try {
+            program = GlProgram(VERTEX, FRAGMENT)
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException(e)
+        }
+        program.setBufferAttribute("aFramePosition", GlUtil.getNormalizedCoordinateBounds(), GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE)
+        val identity = GlUtil.create4x4IdentityMatrix()
+        program.setFloatsUniform("uTransformationMatrix", identity)
+        program.setFloatsUniform("uTexTransformationMatrix", identity)
+    }
+
+    override fun configure(inputWidth: Int, inputHeight: Int): Size = Size(inputWidth, inputHeight)
+
+    override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
+        try {
+            program.use()
+            program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)
+            program.setFloatUniform("uBr", c.brightness)
+            program.setFloatUniform("uCon", c.contrast)
+            program.setFloatUniform("uSat", c.saturation)
+            program.setFloatUniform("uTemp", c.temp)
+            program.setFloatUniform("uHue", c.hue)
+            program.setFloatUniform("uLum", c.lum)
+            program.setFloatUniform("uExp", c.exposure)
+            program.setFloatUniform("uTint", c.tint)
+            program.bindAttributesAndUniforms()
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException(e, presentationTimeUs)
+        }
+    }
+
+    override fun release() {
+        super.release()
+        try {
+            program.delete()
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException(e)
+        }
+    }
+
+    companion object {
+        private const val VERTEX = """#version 100
+attribute vec4 aFramePosition;
+uniform mat4 uTransformationMatrix;
+uniform mat4 uTexTransformationMatrix;
+varying vec2 vTexSamplingCoord;
+void main() {
+  gl_Position = uTransformationMatrix * aFramePosition;
+  vec4 texturePosition = vec4(aFramePosition.x * 0.5 + 0.5, aFramePosition.y * 0.5 + 0.5, 0.0, 1.0);
+  vTexSamplingCoord = (uTexTransformationMatrix * texturePosition).xy;
+}
+"""
+
+        private const val FRAGMENT = """#version 100
+precision highp float;
+uniform sampler2D uTexSampler;
+uniform float uBr;
+uniform float uCon;
+uniform float uSat;
+uniform float uTemp;
+uniform float uHue;
+uniform float uLum;
+uniform float uExp;
+uniform float uTint;
+varying vec2 vTexSamplingCoord;
+void main() {
+  vec4 t = texture2D(uTexSampler, vTexSamplingCoord);
+  vec3 c = t.rgb + uBr;
+  c = (c - 0.5) * uCon + 0.5;
+  c.r *= 1.0 + 0.25 * uTemp;
+  c.b *= 1.0 - 0.25 * uTemp;
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  c = mix(vec3(l), c, uSat);
+  float a = radians(uHue);
+  float cs = cos(a);
+  float sn = sin(a);
+  vec3 k = vec3(0.57735);
+  c = c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs);
+  float ll = uLum / 100.0;
+  c = mix(c, vec3(ll > 0.0 ? 1.0 : 0.0), abs(ll));
+  float e = pow(2.0, uExp * 0.8);
+  c *= vec3(e * (1.0 + 0.12 * uTint), e * (1.0 - 0.2 * uTint), e * (1.0 + 0.12 * uTint));
+  gl_FragColor = vec4(clamp(c, 0.0, 1.0), t.a);
+}
+"""
+    }
+}
+
+private class ToneProgram(private val src: () -> FloatArray, useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
     private val program: GlProgram
     private var w = 1f
     private var h = 1f
@@ -231,6 +331,7 @@ private class ToneProgram(private val v: FloatArray, useHdr: Boolean) : BaseGlSh
         try {
             program.use()
             program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)
+            val v = src()
             program.setFloatUniform("uHi", v[0])
             program.setFloatUniform("uSh", v[1])
             program.setFloatUniform("uVib", v[2])

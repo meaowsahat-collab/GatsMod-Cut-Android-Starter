@@ -25,6 +25,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
 
     private var effectsOk = true
     private var failedId: Any? = null
+    private var liveId: Any? = null
     private var appliedFx = "\u0000"
 
     var listener: Listener? = null
@@ -225,6 +226,12 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         onPlayerReplaced?.invoke(fresh)
     }
 
+    /** While a colour panel is open, its sliders change the picture instantly (no player rebuild). */
+    fun setLive(id: Any?) { liveId = id; applyLook(true) }
+
+    /** Re-draws the paused frame (after a live slider change). */
+    fun redraw() { if (!player.isPlaying && project.main.isNotEmpty()) seekTo(playheadMs) }
+
     /** Applies speed, volume and effects of the clip under the playhead. */
     private fun applyLook(force: Boolean) {
         val c = project.mainClipAt(playheadMs) ?: return
@@ -232,14 +239,16 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val key = "${c.id}|${c.paramSig()}"
         if (!force && key == appliedKey) return
         appliedKey = key
-        val fxKey = if (effectsOk) "${c.id}|${c.filter}|${c.brightness}|${c.contrast}|${c.saturation}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${c.temp}|${c.hue}|${c.lum}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${c.animInMs}|${c.animOut}|${c.animOutMs}|${c.animCombo}|${c.textMotion}|${c.exposure}|${c.tint}|${c.highlights}|${c.shadows}|${c.vibrance}|${c.fade}|${c.sharpen}|${c.vignette}|${c.grain}|${if (c.hasAnim) c.lengthMs else 0L}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
+        val live = liveId != null && c.id == liveId
+        fun lv(x: Float) = if (live) 0f else x
+        val fxKey = if (effectsOk) "$live|${c.id}|${c.filter}|${lv(c.brightness)}|${lv(c.contrast)}|${lv(c.saturation)}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${lv(c.temp)}|${lv(c.hue)}|${lv(c.lum)}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${c.animInMs}|${c.animOut}|${c.animOutMs}|${c.animCombo}|${c.textMotion}|${lv(c.exposure)}|${lv(c.tint)}|${lv(c.highlights)}|${lv(c.shadows)}|${lv(c.vibrance)}|${lv(c.fade)}|${lv(c.sharpen)}|${lv(c.vignette)}|${lv(c.grain)}|${if (c.hasAnim) c.lengthMs else 0L}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
             "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
             c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" } else "off"
         if (fxKey != appliedFx) {
             val hadAny = appliedFx != "\u0000"
             appliedFx = fxKey
             val fx = if (effectsOk) {
-                try { Fx.previewEffects(c) { playheadMs - c.startMs } } catch (e: Exception) { effectsOk = false; emptyList() }
+                try { Fx.previewEffects(c, live) { playheadMs - c.startMs } } catch (e: Exception) { effectsOk = false; emptyList() }
             } else emptyList()
             // empty -> empty needs no rebuild
             if (hadAny || fx.isNotEmpty() || c.denoise > 0f) rebuild(fx)

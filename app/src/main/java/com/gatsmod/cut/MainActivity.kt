@@ -630,10 +630,25 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private val liveRun = Runnable { engine.refresh(); timeline.invalidate() }
+    private var liveLast = 0L
+    private val liveRun = Runnable { liveLast = android.os.SystemClock.uptimeMillis(); engine.refresh(); timeline.invalidate() }
 
-    /** Slider changes: wait a moment so the preview is not rebuilt on every pixel of movement. */
-    private fun live() { ui.removeCallbacks(liveRun); ui.postDelayed(liveRun, 180) }
+    /** Slider changes while dragging: update about 4 times a second (not only after the finger lifts). */
+    private fun live() {
+        ui.removeCallbacks(liveRun)
+        val wait = 250L - (android.os.SystemClock.uptimeMillis() - liveLast)
+        if (wait <= 0L) liveRun.run() else ui.postDelayed(liveRun, wait)
+    }
+
+    private var redrawLast = 0L
+    private val redrawRun = Runnable { redrawLast = android.os.SystemClock.uptimeMillis(); engine.redraw() }
+
+    /** Colour sliders: the picture changes while the finger moves (frame redrawn at most every 50 ms). */
+    private fun liveColor() {
+        ui.removeCallbacks(redrawRun)
+        val wait = 50L - (android.os.SystemClock.uptimeMillis() - redrawLast)
+        if (wait <= 0L) redrawRun.run() else ui.postDelayed(redrawRun, wait)
+    }
 
     // ============================================================ bottom tool row (CapCut style)
 
@@ -1825,6 +1840,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(236)))
         d.setContentView(root)
         d.setOnDismissListener {
+            engine.setLive(null)
             if (c.paramSig() == before) project.discardCheckpoint()
             afterEdit()
         }
@@ -1836,6 +1852,7 @@ class MainActivity : AppCompatActivity() {
         }
         show(startTab)
         d.show()
+        engine.setLive(c.id)
     }
 
     private fun filtersContent(c: Clip): View {
@@ -2000,7 +2017,7 @@ class MainActivity : AppCompatActivity() {
                     val value = (pr + p.min).toFloat()
                     p.set(value)
                     valueText.text = value.toInt().toString()
-                    live()
+                    if (p.name == "Blur") live() else liveColor()
                 }
                 override fun onStartTrackingTouch(s: SeekBar?) {}
                 override fun onStopTrackingTouch(s: SeekBar?) {}
@@ -2014,7 +2031,7 @@ class MainActivity : AppCompatActivity() {
             reset.setOnClickListener {
                 val p = params[sel]
                 p.set(if (p.min == 0) 0f else 0f)
-                loadSeek(); live()
+                loadSeek(); if (p.name == "Blur") live() else liveColor()
             }
             v.addView(reset)
             loadSeek()
