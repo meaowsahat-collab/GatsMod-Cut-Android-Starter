@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
     private var bgPhotoCb: ((Uri) -> Unit)? = null
     private val bgPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); bgPhotoCb?.invoke(it) } }
     private val camLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r -> r.data?.data?.let { loadVideo(it) } }
+    private val videoOverlayPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadVideoOverlay(it) } }
     private val srtPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); readSrt(it) } }
 
     private fun persist(u: Uri) {
@@ -169,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             syncUi()
         }
         timeline.onEdited = { afterEdit() }
-        timeline.onAdd = { k -> when (k) { LaneKind.AUDIO -> audioPicker.launch(arrayOf("audio/*")); LaneKind.OVERLAY -> imagePicker.launch(arrayOf("image/*")); else -> textDialog() } }
+        timeline.onAdd = { k -> when (k) { LaneKind.AUDIO -> audioPicker.launch(arrayOf("audio/*")); LaneKind.OVERLAY -> overlayChoice(); else -> textDialog() } }
         timeline.onSpecial = { name -> if (name == "Cover") coverDialog() else soon(name) }
 
         findViewById<View>(R.id.emptyPreview).setOnClickListener { pickVideo() }
@@ -426,6 +427,38 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    private fun overlayChoice() {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        var dlg: Dialog? = null
+        dlg = sheet("Overlay",
+            button("Add a photo") { dlg?.dismiss(); imagePicker.launch(arrayOf("image/*")) },
+            button("Add a video (picture-in-picture)") { dlg?.dismiss(); videoOverlayPicker.launch(arrayOf("video/*")) },
+            label("A video overlay plays on top of the main video. Move and resize it with your fingers, and use Animations. Its sound is not added - use Extract audio on a normal clip if you need it. Long overlays make the preview and export slower."))
+    }
+
+    private fun loadVideoOverlay(u: Uri) {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        toast("Adding video…")
+        Thread {
+            val info = MediaProbe.probe(this, u)
+            val name = MediaProbe.displayName(this, u)
+            runOnUiThread {
+                if (info == null || !info.hasVideo || info.durationMs <= 0) { toast("Could not read this video"); return@runOnUiThread }
+                val total = project.totalMs()
+                val start = min(engine.playheadMs, max(0L, total - 500))
+                val dur = min(info.durationMs, max(1500L, total - start))
+                project.addFree(
+                    Clip(
+                        id = project.newId(), kind = LaneKind.OVERLAY, startMs = start, uri = u.toString(),
+                        srcInMs = 0, srcOutMs = info.durationMs, srcTotalMs = info.durationMs,
+                        label = name, durMs = dur, sizeFrac = 0.5f, posX = 0.5f, posY = 0.5f
+                    )
+                )
+                afterEdit()
+            }
+        }.start()
+    }
+
     private fun loadImage(u: Uri) {
         if (project.isEmpty()) { toast("Import a video first"); return }
         val start = min(engine.playheadMs, max(0L, project.totalMs() - 100))
@@ -639,7 +672,7 @@ class MainActivity : AppCompatActivity() {
         T(R.drawable.ic_audio, "Audio") { audioPicker.launch(arrayOf("audio/*")) },
         T(R.drawable.ic_text, "Text") { textDialog() },
         T(R.drawable.ic_effects, "Effects") { effectsDialog() },
-        T(R.drawable.ic_overlay, "Overlay") { if (project.isEmpty()) toast("Import a video first") else imagePicker.launch(arrayOf("image/*")) },
+        T(R.drawable.ic_overlay, "Overlay") { overlayChoice() },
         T(R.drawable.ic_captions, "Captions") { srtPicker.launch(arrayOf("*/*")) },
         T(R.drawable.ic_stickers, "Stickers") { stickerDialog() },
         T(R.drawable.ic_filters, "Filters") { filtersDialog() },

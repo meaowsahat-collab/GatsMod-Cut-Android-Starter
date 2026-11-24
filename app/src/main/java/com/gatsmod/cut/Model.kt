@@ -303,6 +303,7 @@ class Project {
             tail.startMs = atMs
             tail.durMs = c.durMs - first
             c.durMs = first
+            if (c.kind == LaneKind.OVERLAY && c.srcTotalMs > 0) tail.srcInMs = (c.srcInMs + first).coerceIn(0L, c.srcTotalMs)
         }
         // keep keyframe animation continuous across the cut
         if (c.keyframes.isNotEmpty()) {
@@ -361,6 +362,7 @@ class Project {
                 val d = deltaMs.coerceIn(-orig.startMs, orig.durMs - MIN_MS)
                 c.startMs = orig.startMs + d
                 c.durMs = orig.durMs - d
+                if (c.kind == LaneKind.OVERLAY && c.srcTotalMs > 0) c.srcInMs = (orig.srcInMs + d).coerceIn(0L, c.srcTotalMs)
             } else {
                 c.durMs = max(MIN_MS, orig.durMs + deltaMs)
             }

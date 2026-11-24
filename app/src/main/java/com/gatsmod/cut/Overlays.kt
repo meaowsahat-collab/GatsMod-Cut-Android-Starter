@@ -30,7 +30,8 @@ object OverlayRenderer {
 
     fun isGif(c: Clip) = c.kind == LaneKind.OVERLAY && c.uri.endsWith(".gif")
     /** True when the picture changes while the clip plays (GIF frames, typewriter text). */
-    fun isDynamic(c: Clip) = isGif(c) || (c.kind != LaneKind.OVERLAY && c.textReveal != 0 && abs(c.tilt) < 0.5f)
+    fun isVideoOverlay(c: Clip) = c.kind == LaneKind.OVERLAY && c.srcTotalMs > 0 && !c.uri.startsWith("sticker:") && !c.uri.endsWith(".gif")
+    fun isDynamic(c: Clip) = isGif(c) || isVideoOverlay(c) || (c.kind != LaneKind.OVERLAY && c.textReveal != 0 && abs(c.tilt) < 0.5f)
 
     /** How many characters are visible at [tMs] for the reveal style. */
     fun visibleChars(c: Clip, tMs: Long): Int {
@@ -68,6 +69,23 @@ object OverlayRenderer {
     }
 
     private val movies = HashMap<String, android.graphics.Movie?>()
+    private val retrievers = HashMap<String, android.media.MediaMetadataRetriever?>()
+    private val lastVideoFrame = HashMap<String, Bitmap>()
+
+    /** One frame of a video overlay (picture-in-picture) at [tMs] after the overlay starts. */
+    private fun videoFrame(ctx: Context, c: Clip, w: Int, tMs: Long): Bitmap? = synchronized(retrievers) {
+        val r = retrievers.getOrPut(c.uri) {
+            try { android.media.MediaMetadataRetriever().also { it.setDataSource(ctx, Uri.parse(c.uri)) } } catch (_: Throwable) { null }
+        } ?: return@synchronized null
+        val ms = (c.srcInMs + tMs).coerceIn(0L, max(0L, c.srcTotalMs - 1))
+        val full = try { r.getFrameAtTime(ms * 1000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST) } catch (_: Throwable) { null }
+        if (full == null) return@synchronized lastVideoFrame[c.uri]
+        val h = max(8, (w * full.height.toFloat() / full.width).toInt())
+        val out = Bitmap.createScaledBitmap(full, w, h, true)
+        if (out !== full) full.recycle()
+        lastVideoFrame[c.uri] = out
+        tilted(out, c.tilt)
+    }
 
     /** One frame of an animated GIF sticker at time [tMs] (loops). */
     private fun gifFrame(c: Clip, w: Int, tMs: Long): Bitmap? {
@@ -184,6 +202,7 @@ object OverlayRenderer {
     private fun renderImage(ctx: Context, c: Clip, videoW: Int, tMs: Long): Bitmap? {
         val w = max(8, (c.sizeFrac * videoW).toInt())
         if (c.uri.endsWith(".gif")) return gifFrame(c, w, tMs)
+        if (isVideoOverlay(c)) return videoFrame(ctx, c, w, tMs)
         if (c.uri.startsWith("sticker:")) {
             val st = StickerArt.byId(c.uri.removePrefix("sticker:")) ?: return null
             return tilted(StickerArt.render(st, w), c.tilt)
@@ -283,7 +302,7 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
 
     private fun bitmapFor(c: Clip, r: RectF): Bitmap? {
         val t = if (OverlayRenderer.isDynamic(c)) max(0L, playheadMs - c.startMs) else 0L
-        val key = "${t / 40L}|${c.textReveal}|${c.id}|${c.text}|${c.color}|${c.sizeFrac}|${c.bold}|${c.font}|${c.italic}|${c.strokeColor}|${c.strokeW}|${c.bgColor}|${c.shadow}|${c.textFx}|${c.tilt}|${c.uri}|${r.width().toInt()}x${r.height().toInt()}"
+        val key = "${t / (if (OverlayRenderer.isVideoOverlay(c)) 120L else 40L)}|${c.textReveal}|${c.id}|${c.text}|${c.color}|${c.sizeFrac}|${c.bold}|${c.font}|${c.italic}|${c.strokeColor}|${c.strokeW}|${c.bgColor}|${c.shadow}|${c.textFx}|${c.tilt}|${c.uri}|${r.width().toInt()}x${r.height().toInt()}"
         if (cache.size > 40) cache.clear()
         return cache.getOrPut(key) { OverlayRenderer.render(context, c, r.width().toInt(), r.height().toInt(), t) }
     }
