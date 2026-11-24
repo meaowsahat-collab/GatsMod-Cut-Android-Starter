@@ -310,6 +310,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         ui.removeCallbacksAndMessages(null)
         try { recorder?.release() } catch (_: Exception) {}
+        try { tts?.shutdown() } catch (_: Exception) {}
+        stopPreview()
         exporter.cancel()
         engine.release()
         Thumbs.clear()
@@ -419,16 +421,156 @@ class MainActivity : AppCompatActivity() {
             val name = MediaProbe.displayName(this, u)
             runOnUiThread {
                 if (info == null || info.durationMs <= 0) { toast("Could not read this audio"); return@runOnUiThread }
-                val start = min(engine.playheadMs, max(0L, project.totalMs() - 100))
-                project.addFree(
-                    Clip(
-                        id = project.newId(), kind = LaneKind.AUDIO, startMs = start, uri = u.toString(),
-                        srcInMs = 0, srcOutMs = info.durationMs, srcTotalMs = info.durationMs, label = name
-                    )
-                )
-                afterEdit()
+                addAudioClip(u.toString(), info.durationMs, name)
             }
         }.start()
+    }
+
+    private fun addAudioClip(uri: String, durMs: Long, name: String) {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        val start = min(engine.playheadMs, max(0L, project.totalMs() - 100))
+        project.addFree(
+            Clip(id = project.newId(), kind = LaneKind.AUDIO, startMs = start, uri = uri,
+                srcInMs = 0, srcOutMs = durMs, srcTotalMs = durMs, label = name)
+        )
+        afterEdit()
+    }
+
+    // ============================================================ Audio menu (Extract / Sounds / Sound FX / Record / Text to audio / Brand music / Copyright)
+
+    private var audioMenu = false
+    private val extractPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u -> u?.let { persist(it); loadAudio(it) } }
+    private var tts: android.speech.tts.TextToSpeech? = null
+    private var previewPlayer: android.media.MediaPlayer? = null
+
+    private fun audioTools(): List<T> = listOf(
+        T(R.drawable.ic_folder, "Extract") { if (project.isEmpty()) toast("Import a video first") else { toast("Pick a video - its sound is added to the audio track"); extractPicker.launch(arrayOf("video/*")) } },
+        T(R.drawable.ic_music, "Sounds") { audioPicker.launch(arrayOf("audio/*")) },
+        T(R.drawable.ic_soundfx, "Sound FX") { soundLibraryDialog(false) },
+        T(R.drawable.ic_mic, "Record") { startVoiceover() },
+        T(R.drawable.ic_tts, "Text to audio") { ttsDialog() },
+        T(R.drawable.ic_brand, "Brand music") { soundLibraryDialog(true) },
+        T(R.drawable.ic_copyright, "Copyright") { copyrightDialog() }
+    )
+
+    private fun stopPreview() {
+        try { previewPlayer?.release() } catch (_: Exception) {}
+        previewPlayer = null
+    }
+
+    private fun playPreview(f: java.io.File) {
+        stopPreview()
+        try {
+            previewPlayer = android.media.MediaPlayer().apply { setDataSource(f.path); prepare(); start() }
+        } catch (_: Exception) { toast("Could not play this sound") }
+    }
+
+    /** Sound FX (short effects) and Brand music (background tracks): both are made inside the app, so there is nothing to download and no copyright. */
+    private fun soundLibraryDialog(music: Boolean) {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        val items = if (music) SoundGen.MUSIC else SoundGen.SFX
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun work(it: SoundGen.Item, then: (java.io.File) -> Unit) {
+            toast(if (music) "Making the track..." else "Preparing...")
+            Thread {
+                val f = try { if (music) SoundGen.ensureMusic(this, it) else SoundGen.ensureSfx(this, it) } catch (_: Throwable) { null }
+                runOnUiThread { if (f == null) toast("Could not make this sound") else then(f) }
+            }.start()
+        }
+        items.forEach { it ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
+            val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            col.addView(TextView(this).apply { text = it.name; setTextColor(Color.WHITE); textSize = 15f })
+            col.addView(TextView(this).apply { text = it.note + "  ·  " + (if (it.seconds >= 10f) "${it.seconds.toInt()} s" else "%.1f s".format(it.seconds)); setTextColor(0xFF9A9AA2.toInt()); textSize = 12f })
+            row.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            val play = button("▶") { work(it) { f -> playPreview(f) } }
+            val add = button("Add") { work(it) { f ->
+                stopPreview()
+                addAudioClip(Uri.fromFile(f).toString(), (it.seconds * 1000).toLong(), it.name)
+            } }
+            row.addView(play, LinearLayout.LayoutParams(dp(54), dp(40)).apply { rightMargin = dp(8) })
+            row.addView(add, LinearLayout.LayoutParams(dp(64), dp(40)))
+            list.addView(row)
+        }
+        val scroll = ScrollView(this)
+        scroll.addView(list)
+        sheet(if (music) "Brand music" else "Sound FX", label(if (music) "Original background tracks made inside Get Cut - free to use anywhere. They are simple electronic music, not recordings of real instruments. Added at the playhead; trim or fade them in the audio track."
+            else "Sound effects made inside Get Cut - free to use anywhere. Tap ▶ to listen, Add to put it at the playhead."),
+            scroll.also { it.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(360)) },
+            onClose = { stopPreview() })
+    }
+
+    private fun ttsDialog() {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        val input = EditText(this).apply {
+            hint = "Type the text to turn into speech"; setTextColor(Color.WHITE); setHintTextColor(0xFF8A8A92.toInt())
+            textSize = 15f; minLines = 3; gravity = Gravity.TOP or Gravity.START
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(0xFF34343B.toInt()) }
+        }
+        val langs = listOf("Phone default" to null, "English (US)" to java.util.Locale.US, "English (UK)" to java.util.Locale.UK,
+            "Bengali" to java.util.Locale("bn", "BD"), "Hindi" to java.util.Locale("hi", "IN"), "Arabic" to java.util.Locale("ar"),
+            "Urdu" to java.util.Locale("ur", "PK"), "Spanish" to java.util.Locale("es"), "French" to java.util.Locale.FRENCH)
+        var lang = 0; var rate = 1f; var pitch = 1f
+        val status = label("The voice comes from your phone's Text-to-speech engine. A language only works if its voice is installed (Settings > Text-to-speech).")
+        var busy = false
+        fun fail(msg: String) { runOnUiThread { busy = false; (status as? TextView)?.text = msg } }
+        fun speak(engine: android.speech.tts.TextToSpeech, text: String) {
+            val loc = langs[lang].second
+            if (loc != null) {
+                val r = engine.setLanguage(loc)
+                if (r == android.speech.tts.TextToSpeech.LANG_MISSING_DATA || r == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED) {
+                    fail("This phone has no ${langs[lang].first} voice. Install one in Settings > Text-to-speech, or pick another language."); return
+                }
+            }
+            engine.setSpeechRate(rate); engine.setPitch(pitch)
+            val out = java.io.File(java.io.File(filesDir, "tts").apply { mkdirs() }, "tts_${System.currentTimeMillis()}.wav")
+            engine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(id: String?) {}
+                override fun onError(id: String?) { fail("Could not make the speech") }
+                override fun onDone(id: String?) {
+                    val info = MediaProbe.probe(this@MainActivity, Uri.fromFile(out))
+                    runOnUiThread {
+                        busy = false
+                        if (info == null || info.durationMs <= 0) { (status as? TextView)?.text = "Could not make the speech"; return@runOnUiThread }
+                        (status as? TextView)?.text = "Added to the audio track."
+                        addAudioClip(Uri.fromFile(out).toString(), info.durationMs, "Voice: " + text.take(18))
+                    }
+                }
+            })
+            val r = engine.synthesizeToFile(text, Bundle(), out, "gc_tts")
+            if (r != android.speech.tts.TextToSpeech.SUCCESS) fail("Could not make the speech")
+        }
+        val make = button("Add to timeline") {
+            val text = input.text.toString().trim()
+            if (text.isEmpty()) { toast("Type some text first"); return@button }
+            if (busy) return@button
+            busy = true
+            (status as? TextView)?.text = "Making the speech..."
+            val ready = tts
+            if (ready != null) speak(ready, text)
+            else tts = android.speech.tts.TextToSpeech(this) { code ->
+                if (code == android.speech.tts.TextToSpeech.SUCCESS) runOnUiThread { speak(tts!!, text) }
+                else fail("No Text-to-speech engine found on this phone")
+            }
+        }
+        sheet("Text to audio", input, chips(langs.map { it.first }, 0) { lang = it },
+            slider("Speed", 0.5f, 2f, 1f, { "%.1fx".format(it) }) { rate = it },
+            slider("Pitch", 0.5f, 2f, 1f, { "%.1f".format(it) }) { pitch = it },
+            make, status)
+    }
+
+    private fun copyrightDialog() {
+        val sb = StringBuilder()
+        if (project.audio.isEmpty()) sb.append("There is no music or sound in the audio track yet.\n\n")
+        else project.audio.forEach {
+            val safe = SoundGen.isBuiltIn(it.uri) || it.uri.contains("/tts/") || it.uri.contains("/voice")
+            sb.append(if (safe) "✔ " else "? ").append(it.label.ifBlank { "Audio" }).append("\n   ")
+              .append(if (safe) "Made inside Get Cut or by you - safe to publish." else "Your own file - Get Cut cannot check it.").append("\n\n")
+        }
+        sb.append("Get Cut has no online music database, so it cannot detect copyrighted songs like CapCut does. ")
+            .append("Sounds from Sound FX, Brand music, Text to audio and your own recordings are safe. Songs from films, apps or the radio can get a video muted or blocked on YouTube, TikTok and Facebook.")
+        sheet("Copyright check", label(sb.toString()))
     }
 
     private fun overlayChoice() {
@@ -747,7 +889,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun mainTools(): List<T> = listOf(
         T(R.drawable.ic_cut, "Edit") { val c = need(); if (c != null) syncUi() },
-        T(R.drawable.ic_audio, "Audio") { audioPicker.launch(arrayOf("audio/*")) },
+        T(R.drawable.ic_audio, "Audio") { audioMenu = true; buildToolbar() },
         T(R.drawable.ic_text, "Text") { textDialog() },
         T(R.drawable.ic_effects, "Effects") { effectsDialog() },
         T(R.drawable.ic_overlay, "Overlay") { overlayChoice() },
@@ -1555,7 +1697,11 @@ class MainActivity : AppCompatActivity() {
         val row = findViewById<LinearLayout>(R.id.toolbarRow)
         row.removeAllViews()
         val sel = project.selected()
-        if (sel == null) {
+        if (sel != null) audioMenu = false
+        if (sel == null && audioMenu) {
+            row.addView(toolItem(T(R.drawable.ic_chevron, "Back") { audioMenu = false; buildToolbar() }, back = true))
+            audioTools().forEach { row.addView(toolItem(it)) }
+        } else if (sel == null) {
             mainTools().forEach { row.addView(toolItem(it)) }
         } else {
             row.addView(toolItem(T(R.drawable.ic_chevron, "Back") { project.selectedId = -1L; syncUi() }, back = true))
@@ -1565,7 +1711,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.toolbarScroll).scrollTo(0, 0)
     }
 
-    private fun toolbarKeyNow(): String = project.selected()?.kind?.name ?: "none"
+    private fun toolbarKeyNow(): String = (project.selected()?.kind?.name ?: "none") + (if (audioMenu) "+audio" else "")
 
     private fun refreshRes() {
         val base = when (resShort) { 480 -> "480P"; 720 -> "720P"; 1080 -> "1080P"; 1440 -> "2K"; else -> "4K" }
