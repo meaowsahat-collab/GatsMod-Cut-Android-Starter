@@ -196,3 +196,126 @@ void main() {
 """
     }
 }
+
+
+/** Highlights, shadows, vibrance, fade, sharpen, vignette and grain in one pass. [v] = [highlights, shadows, vibrance, fade, sharpen, vignette, grain], each -1..1 (fade, sharpen, grain 0..1). */
+class ToneGlEffect(private val v: FloatArray) : GlEffect {
+    override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = ToneProgram(v, useHdr)
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = v.all { it == 0f }
+}
+
+private class ToneProgram(private val v: FloatArray, useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
+    private val program: GlProgram
+    private var w = 1f
+    private var h = 1f
+
+    init {
+        try {
+            program = GlProgram(VERTEX, FRAGMENT)
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException(e)
+        }
+        program.setBufferAttribute("aFramePosition", GlUtil.getNormalizedCoordinateBounds(), GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE)
+        val identity = GlUtil.create4x4IdentityMatrix()
+        program.setFloatsUniform("uTransformationMatrix", identity)
+        program.setFloatsUniform("uTexTransformationMatrix", identity)
+    }
+
+    override fun configure(inputWidth: Int, inputHeight: Int): Size {
+        w = inputWidth.toFloat()
+        h = inputHeight.toFloat()
+        return Size(inputWidth, inputHeight)
+    }
+
+    override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
+        try {
+            program.use()
+            program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)
+            program.setFloatUniform("uHi", v[0])
+            program.setFloatUniform("uSh", v[1])
+            program.setFloatUniform("uVib", v[2])
+            program.setFloatUniform("uFade", v[3])
+            program.setFloatUniform("uSharp", v[4])
+            program.setFloatUniform("uVig", v[5])
+            program.setFloatUniform("uGrain", v[6])
+            program.setFloatsUniform("uRes", floatArrayOf(w, h))
+            program.setFloatUniform("uTime", ((presentationTimeUs / 1000L) % 100000L) / 1000f)
+            program.bindAttributesAndUniforms()
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException(e, presentationTimeUs)
+        }
+    }
+
+    override fun release() {
+        super.release()
+        try {
+            program.delete()
+        } catch (e: GlUtil.GlException) {
+            throw VideoFrameProcessingException(e)
+        }
+    }
+
+    companion object {
+        private const val VERTEX = """#version 100
+attribute vec4 aFramePosition;
+uniform mat4 uTransformationMatrix;
+uniform mat4 uTexTransformationMatrix;
+varying vec2 vTexSamplingCoord;
+void main() {
+  gl_Position = uTransformationMatrix * aFramePosition;
+  vec4 texturePosition = vec4(aFramePosition.x * 0.5 + 0.5, aFramePosition.y * 0.5 + 0.5, 0.0, 1.0);
+  vTexSamplingCoord = (uTexTransformationMatrix * texturePosition).xy;
+}
+"""
+
+        private const val FRAGMENT = """#version 100
+precision highp float;
+uniform sampler2D uTexSampler;
+uniform float uHi;
+uniform float uSh;
+uniform float uVib;
+uniform float uFade;
+uniform float uSharp;
+uniform float uVig;
+uniform float uGrain;
+uniform vec2 uRes;
+uniform float uTime;
+varying vec2 vTexSamplingCoord;
+
+float rand(vec2 co) {
+  return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+vec4 tex(vec2 uv) {
+  return texture2D(uTexSampler, clamp(uv, 0.0, 1.0));
+}
+
+void main() {
+  vec2 uv = vTexSamplingCoord;
+  vec2 px = 1.0 / uRes;
+  vec4 col = tex(uv);
+  if (uSharp > 0.0) {
+    vec3 n = tex(uv + vec2(px.x, 0.0)).rgb + tex(uv - vec2(px.x, 0.0)).rgb
+           + tex(uv + vec2(0.0, px.y)).rgb + tex(uv - vec2(0.0, px.y)).rgb;
+    float k = uSharp * 0.8;
+    col.rgb = col.rgb * (1.0 + 4.0 * k) - k * n;
+  }
+  float l = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+  float sw = 1.0 - smoothstep(0.0, 0.55, l);
+  float hw = smoothstep(0.45, 1.0, l);
+  col.rgb += uSh * 0.35 * sw + uHi * 0.35 * hw;
+  float l2 = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+  float mx = max(max(col.r, col.g), col.b);
+  float mn = min(min(col.r, col.g), col.b);
+  float sat = mx - mn;
+  col.rgb = mix(vec3(l2), col.rgb, 1.0 + uVib * (1.0 - sat));
+  col.rgb = col.rgb * (1.0 - 0.25 * uFade) + 0.12 * uFade;
+  float r = length((uv - 0.5) * vec2(uRes.x / uRes.y, 1.0));
+  col.rgb *= 1.0 - uVig * smoothstep(0.25, 0.95, r);
+  col.rgb += (rand(uv * uRes + uTime) - 0.5) * uGrain * 0.4;
+  gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), col.a);
+}
+"""
+    }
+}

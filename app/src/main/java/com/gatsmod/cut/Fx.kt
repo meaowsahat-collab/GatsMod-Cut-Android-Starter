@@ -31,7 +31,55 @@ import kotlin.math.sqrt
  * so what you see in the editor is what gets exported.
  */
 object Fx {
-    val FILTER_NAMES = listOf("None", "Vivid", "Warm", "Cool", "Mono", "Sepia", "Fade", "Invert")
+    /** sat: HSL saturation change (-100..100), con: contrast (-1..1), br: brightness (-1..1), r/g/b: channel scales, hue: degrees, mode 1 grey / 2 sepia / 3 invert. */
+    class FilterDef(val name: String, val sat: Float = 0f, val con: Float = 0f, val br: Float = 0f,
+                    val r: Float = 1f, val g: Float = 1f, val b: Float = 1f, val hue: Float = 0f, val mode: Int = 0)
+
+    val FILTERS = listOf(
+        FilterDef("None"),
+        FilterDef("Vivid", sat = 35f, con = .12f), FilterDef("Warm", r = 1.12f, b = .85f), FilterDef("Cool", r = .88f, b = 1.15f),
+        FilterDef("Mono", mode = 1), FilterDef("Sepia", mode = 2), FilterDef("Fade", sat = -25f, con = -.2f, br = .06f), FilterDef("Invert", mode = 3),
+        FilterDef("Clear", sat = 15f, con = .08f, br = .02f), FilterDef("Natural", sat = 8f, con = .04f, br = .03f),
+        FilterDef("Fresh", sat = 20f, con = .05f, br = .06f, r = .98f, g = 1.04f, b = 1.04f),
+        FilterDef("Sunny", sat = 20f, con = .05f, br = .05f, r = 1.12f, g = 1.05f, b = .82f),
+        FilterDef("Golden", sat = 15f, con = .06f, br = .03f, r = 1.15f, g = 1.02f, b = .78f),
+        FilterDef("Sunset", sat = 25f, con = .1f, r = 1.18f, g = .95f, b = .8f),
+        FilterDef("Peach", sat = 10f, con = -.04f, br = .08f, r = 1.1f, g = .98f, b = .95f),
+        FilterDef("Rose", sat = 15f, con = -.02f, br = .05f, r = 1.1f, g = .95f, b = 1.02f),
+        FilterDef("Candy", sat = 40f, con = -.05f, br = .08f, r = 1.05f, g = .98f, b = 1.08f),
+        FilterDef("Pastel", sat = -15f, con = -.12f, br = .14f, r = 1.02f, g = 1.02f, b = 1.04f),
+        FilterDef("Dreamy", sat = -10f, con = -.15f, br = .12f, r = 1.04f, b = 1.08f),
+        FilterDef("Film", sat = -12f, con = .1f, r = 1.06f, g = 1.02f, b = .9f),
+        FilterDef("Kodak", sat = 10f, con = .12f, br = .02f, r = 1.1f, b = .88f),
+        FilterDef("Vintage", sat = -25f, con = .05f, br = .04f, r = 1.12f, g = 1.02f, b = .82f),
+        FilterDef("Retro", sat = -18f, con = .12f, r = 1.08f, b = .88f, hue = 8f),
+        FilterDef("Old photo", sat = -5f, con = .1f, mode = 2),
+        FilterDef("Noir", con = .35f, br = -.05f, mode = 1),
+        FilterDef("B&W Soft", con = -.1f, br = .05f, mode = 1),
+        FilterDef("B&W High", con = .5f, mode = 1),
+        FilterDef("Silver", con = .15f, r = .98f, b = 1.04f, mode = 1),
+        FilterDef("Cinema", sat = 10f, con = .2f, br = -.02f, r = 1.06f, b = .94f),
+        FilterDef("Teal Orange", sat = 22f, con = .16f, r = 1.12f, g = .98f, b = .88f),
+        FilterDef("Moody", sat = -20f, con = .25f, br = -.06f, r = .96f, b = 1.06f),
+        FilterDef("Dark", sat = -10f, con = .3f, br = -.12f),
+        FilterDef("Matte", sat = -20f, con = -.18f, br = .1f, b = 1.03f),
+        FilterDef("Cold", sat = -5f, con = .05f, r = .86f, b = 1.18f),
+        FilterDef("Ice", sat = -10f, br = .06f, r = .82f, b = 1.2f),
+        FilterDef("Ocean", sat = 15f, con = .08f, r = .85f, g = 1.02f, b = 1.15f),
+        FilterDef("Forest", sat = 18f, con = .08f, br = -.02f, r = .92f, g = 1.1f, b = .88f),
+        FilterDef("Spring", sat = 25f, con = .04f, br = .06f, r = .96f, g = 1.1f, b = .95f),
+        FilterDef("Autumn", sat = 20f, con = .1f, r = 1.15f, b = .8f),
+        FilterDef("Cyber", sat = 40f, con = .2f, r = .9f, b = 1.25f, hue = 320f),
+        FilterDef("Neon", sat = 60f, con = .2f, b = 1.1f, hue = 20f),
+        FilterDef("Cherry", sat = 30f, con = .1f, br = -.02f, r = 1.2f, g = .92f, b = .95f),
+        FilterDef("Violet", sat = 25f, con = .08f, r = 1.05f, g = .92f, b = 1.2f),
+        FilterDef("Haze", sat = -25f, con = -.2f, br = .15f),
+        FilterDef("HDR", sat = 45f, con = .3f),
+        FilterDef("Punch", sat = 30f, con = .22f),
+        FilterDef("Gloom", sat = -40f, con = .15f, br = -.05f, r = .95f, b = 1.05f),
+        FilterDef("Lomo", sat = 35f, con = .25f, br = -.05f, r = 1.1f, b = .9f)
+    )
+    val FILTER_NAMES get() = FILTERS.map { it.name }
     val CROP_NAMES = listOf("Original", "1:1", "9:16", "16:9", "4:5", "4:3")
     val CROP_RATIOS = listOf(0f, 1f, 9f / 16f, 16f / 9f, 4f / 5f, 4f / 3f)
 
@@ -65,14 +113,20 @@ object Fx {
                     .build()
             )
         }
-        when (c.filter) {
-            1 -> { l.add(HslAdjustment.Builder().adjustSaturation(35f).build()); l.add(Contrast(0.12f)) }
-            2 -> l.add(RgbAdjustment.Builder().setRedScale(1.12f).setBlueScale(0.85f).build())
-            3 -> l.add(RgbAdjustment.Builder().setRedScale(0.88f).setBlueScale(1.15f).build())
-            4 -> l.add(RgbFilter.createGrayscaleFilter())
-            5 -> l.add(SepiaMatrix())
-            6 -> { l.add(Contrast(-0.2f)); l.add(Brightness(0.06f)); l.add(HslAdjustment.Builder().adjustSaturation(-25f).build()) }
-            7 -> l.add(RgbFilter.createInvertedFilter())
+        val fd = FILTERS.getOrNull(c.filter)
+        if (fd != null && c.filter != 0) {
+            when (fd.mode) { 1 -> l.add(RgbFilter.createGrayscaleFilter()); 2 -> l.add(SepiaMatrix()); 3 -> l.add(RgbFilter.createInvertedFilter()) }
+            if (fd.sat != 0f || fd.hue != 0f) l.add(HslAdjustment.Builder().adjustHue(fd.hue).adjustSaturation(fd.sat).build())
+            if (fd.con != 0f) l.add(Contrast(fd.con))
+            if (fd.br != 0f) l.add(Brightness(fd.br))
+            if (fd.r != 1f || fd.g != 1f || fd.b != 1f) l.add(RgbAdjustment.Builder().setRedScale(fd.r).setGreenScale(fd.g).setBlueScale(fd.b).build())
+        }
+        if (c.exposure != 0f || c.tint != 0f) {
+            val e = Math.pow(2.0, c.exposure.toDouble() * 0.8).toFloat()
+            l.add(RgbAdjustment.Builder().setRedScale(e * (1f + 0.12f * c.tint)).setGreenScale(e * (1f - 0.2f * c.tint)).setBlueScale(e * (1f + 0.12f * c.tint)).build())
+        }
+        if (c.highlights != 0f || c.shadows != 0f || c.vibrance != 0f || c.fade != 0f || c.sharpen != 0f || c.vignette != 0f || c.grain != 0f) {
+            l.add(ToneGlEffect(floatArrayOf(c.highlights, c.shadows, c.vibrance, c.fade, c.sharpen, c.vignette, c.grain)))
         }
         if (c.blur > 0.1f) l.add(GaussianBlur(c.blur.coerceAtMost(25f)))
         if (c.fx != 0 || c.maskShape != 0) {

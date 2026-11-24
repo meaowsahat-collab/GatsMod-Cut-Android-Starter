@@ -64,6 +64,14 @@ class Exporter(private val ctx: Context) {
         transformer = null
     }
 
+    fun bitrateFor(s: ExportSettings): Int = ((when {
+        s.shortSide >= 2000 -> 35_000_000
+        s.shortSide >= 1300 -> 18_000_000
+        s.shortSide >= 1000 -> 10_000_000
+        s.shortSide >= 600 -> 5_000_000
+        else -> 2_500_000
+    }) * (s.fps / 30f).coerceIn(0.8f, 2f) * s.quality).toInt().coerceIn(1_500_000, 60_000_000)
+
     fun outputSize(p: Project, shortSide: Int): Size {
         val aspect = p.effectiveAspect()
         var w: Int
@@ -84,13 +92,7 @@ class Exporter(private val ctx: Context) {
             cb.onError("Could not prepare export: ${e.message}")
             return
         }
-        val bitrate = ((when {
-            s.shortSide >= 2000 -> 35_000_000
-            s.shortSide >= 1300 -> 18_000_000
-            s.shortSide >= 1000 -> 10_000_000
-            s.shortSide >= 600 -> 5_000_000
-            else -> 2_500_000
-        }) * (s.fps / 30f).coerceIn(0.8f, 2f) * s.quality).toInt().coerceIn(1_500_000, 60_000_000)
+        val bitrate = bitrateFor(s)
         val encoder = DefaultEncoderFactory.Builder(ctx)
             .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(bitrate).build())
             .build()

@@ -1303,13 +1303,26 @@ class MainActivity : AppCompatActivity() {
         val sizes = listOf(480, 720, 1080, 1440, 2160)
         val opts = listOf(24, 30, 60)
         val qs = floatArrayOf(0.6f, 1f, 1.6f, 2.5f)
+        val info = TextView(this)
+        info.setTextColor(0xFFFFD54F.toInt())
+        info.textSize = 13f
+        info.setPadding(0, dp(8), 0, dp(4))
+        fun upd() {
+            val sz = exporter.outputSize(project, resShort)
+            val br = exporter.bitrateFor(ExportSettings(resShort, fps, quality))
+            val sec = (project.totalMs() / 1000L).coerceAtLeast(1L)
+            val mb = br / 8.0 * sec / 1_000_000.0 + sec * 0.016
+            info.text = "Output: ${sz.width}×${sz.height} · $fps fps · ${"%.1f".format(br / 1e6)} Mbps · about ${"%.0f".format(mb)} MB"
+        }
+        upd()
         sheet("Export settings",
             label("Resolution"),
-            chips(listOf("480P", "720P", "1080P", "2K", "4K"), sizes.indexOf(resShort)) { resShort = sizes[it]; refreshRes() },
+            chips(listOf("480P", "720P", "1080P", "2K", "4K"), sizes.indexOf(resShort)) { resShort = sizes[it]; refreshRes(); upd() },
             label("Frame rate"),
-            chips(opts.map { "$it fps" }, opts.indexOf(fps)) { fps = opts[it]; refreshRes() },
+            chips(opts.map { "$it fps" }, opts.indexOf(fps)) { fps = opts[it]; refreshRes(); upd() },
             label("Quality (bitrate)"),
-            chips(listOf("Low", "Standard", "High", "Max"), qs.indexOfFirst { it == quality }) { quality = qs[it] },
+            chips(listOf("Low", "Standard", "High", "Max"), qs.indexOfFirst { it == quality }) { quality = qs[it]; upd() },
+            info,
             label("Higher quality gives a sharper video and a bigger file. Frames are only dropped, never invented: a 30 fps video stays 30 fps even if you pick 60."),
             label("2K / 4K export depends on what your phone's video encoder supports."))
     }
@@ -1426,16 +1439,19 @@ class MainActivity : AppCompatActivity() {
     private class Param(val name: String, val icon: Int, val min: Int, val max: Int, val get: () -> Float, val set: (Float) -> Unit)
 
     private fun filterMatrix(i: Int): android.graphics.ColorFilter? {
+        val f = Fx.FILTERS.getOrNull(i)?.takeIf { i != 0 } ?: return null
         val cm = android.graphics.ColorMatrix()
-        when (i) {
-            1 -> cm.setSaturation(1.5f)
-            2 -> cm.setScale(1.12f, 1f, 0.85f, 1f)
-            3 -> cm.setScale(0.88f, 1f, 1.15f, 1f)
-            4 -> cm.setSaturation(0f)
-            5 -> cm.set(floatArrayOf(.393f, .769f, .189f, 0f, 0f, .349f, .686f, .168f, 0f, 0f, .272f, .534f, .131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
-            6 -> cm.set(floatArrayOf(.8f, 0f, 0f, 0f, 34f, 0f, .8f, 0f, 0f, 34f, 0f, 0f, .8f, 0f, 34f, 0f, 0f, 0f, 1f, 0f))
-            7 -> cm.set(floatArrayOf(-1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))
-            else -> return null
+        when (f.mode) {
+            1 -> cm.setSaturation(0f)
+            2 -> cm.set(floatArrayOf(.393f, .769f, .189f, 0f, 0f, .349f, .686f, .168f, 0f, 0f, .272f, .534f, .131f, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+            3 -> cm.set(floatArrayOf(-1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))
+            else -> cm.setSaturation(1f + f.sat / 100f)
+        }
+        val sc = android.graphics.ColorMatrix(); sc.setScale(f.r, f.g, f.b, 1f); cm.postConcat(sc)
+        if (f.con != 0f || f.br != 0f) {
+            val k = 1f + f.con
+            val o = 127.5f * (1f - k) + 255f * f.br
+            cm.postConcat(android.graphics.ColorMatrix(floatArrayOf(k, 0f, 0f, 0f, o, 0f, k, 0f, 0f, o, 0f, 0f, k, 0f, o, 0f, 0f, 0f, 1f, 0f)))
         }
         return android.graphics.ColorMatrixColorFilter(cm)
     }
@@ -1591,6 +1607,15 @@ class MainActivity : AppCompatActivity() {
             Param("Temperature", R.drawable.ic_effects, -100, 100, { c.temp * 100f }, { c.temp = it / 100f }),
             Param("Hue", R.drawable.ic_hsl, -100, 100, { (if (c.hue > 180f) c.hue - 360f else c.hue) / 1.8f }, { val h = it * 1.8f; c.hue = if (h < 0f) h + 360f else h }),
             Param("Lightness", R.drawable.ic_lut, -100, 100, { c.lum }, { c.lum = it }),
+            Param("Exposure", R.drawable.ic_hdr, -100, 100, { c.exposure * 100f }, { c.exposure = it / 100f }),
+            Param("Highlights", R.drawable.ic_effects, -100, 100, { c.highlights * 100f }, { c.highlights = it / 100f }),
+            Param("Shadows", R.drawable.ic_adjust, -100, 100, { c.shadows * 100f }, { c.shadows = it / 100f }),
+            Param("Vibrance", R.drawable.ic_color, -100, 100, { c.vibrance * 100f }, { c.vibrance = it / 100f }),
+            Param("Tint", R.drawable.ic_hsl, -100, 100, { c.tint * 100f }, { c.tint = it / 100f }),
+            Param("Fade", R.drawable.ic_lut, 0, 100, { c.fade * 100f }, { c.fade = it / 100f }),
+            Param("Sharpen", R.drawable.ic_effects, 0, 100, { c.sharpen * 100f }, { c.sharpen = it / 100f }),
+            Param("Vignette", R.drawable.ic_blur, -100, 100, { c.vignette * 100f }, { c.vignette = it / 100f }),
+            Param("Grain", R.drawable.ic_effects, 0, 100, { c.grain * 100f }, { c.grain = it / 100f }),
             Param("Blur", R.drawable.ic_blur, 0, 100, { c.blur * 4f }, { c.blur = it / 4f })
         )
         val box = LinearLayout(this)
