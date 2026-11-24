@@ -167,11 +167,15 @@ class SoundsPage(
         val chipsRow = LinearLayout(act); chipsRow.orientation = LinearLayout.HORIZONTAL
         chipHolder = chipsRow
         val hs = HorizontalScrollView(act); hs.isHorizontalScrollBarEnabled = false; hs.addView(chipsRow)
-        root.addView(hs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46)).apply { topMargin = dp(10) })
+        root.addView(hs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(62)).apply { topMargin = dp(10) })
+        val tileColors = listOf(intArrayOf(0xFFFF6B35.toInt(), 0xFFB5179E.toInt()), intArrayOf(0xFFB00020.toInt(), 0xFF1B1B3A.toInt()), intArrayOf(0xFF3A86FF.toInt(), 0xFF00B4D8.toInt()),
+            intArrayOf(0xFFFFB703.toInt(), 0xFFFB8500.toInt()), intArrayOf(0xFF4361EE.toInt(), 0xFF7209B7.toInt()), intArrayOf(0xFF2D3142.toInt(), 0xFFBF9ACA.toInt()))
         categories.forEachIndexed { i, name ->
-            val c = TextView(act); c.text = name; c.textSize = 14f; c.gravity = Gravity.CENTER; c.setPadding(dp(16), 0, dp(16), 0)
+            val c = TextView(act); c.text = name; c.textSize = 14f; c.gravity = Gravity.BOTTOM or Gravity.START; c.setPadding(dp(10), 0, dp(10), dp(8))
+            c.setTextColor(Color.WHITE); c.typeface = android.graphics.Typeface.DEFAULT_BOLD
+            c.tag = GradientDrawable.Orientation.TL_BR to tileColors[i % tileColors.size]
             c.setOnClickListener { cat = i; query = if (i == 0) "" else name; box.setText(""); tab = 0; refreshChips(); search(true) }
-            chipsRow.addView(c, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(36)).apply { rightMargin = dp(8) })
+            chipsRow.addView(c, LinearLayout.LayoutParams(dp(96), dp(58)).apply { rightMargin = dp(8) })
         }
         refreshChips()
 
@@ -192,9 +196,14 @@ class SoundsPage(
         root.addView(tabs, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)).apply { topMargin = dp(6) })
         tabHolder = tabs
 
-        val heading = TextView(act); heading.setTextColor(Color.WHITE); heading.textSize = 20f; heading.setPadding(0, dp(14), 0, dp(6))
+        val heading = TextView(act); heading.setTextColor(Color.WHITE); heading.textSize = 20f
         headingView = heading
-        root.addView(heading)
+        val hrow = LinearLayout(act); hrow.gravity = Gravity.CENTER_VERTICAL; hrow.setPadding(0, dp(12), 0, dp(6))
+        hrow.addView(heading, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val src = TextView(act); src.text = if (jamendoId().isBlank()) "More music ›" else "Source ›"; src.setTextColor(CYAN); src.textSize = 14f; src.setPadding(dp(8), dp(6), 0, dp(6))
+        src.setOnClickListener { sourceDialog() }
+        hrow.addView(src)
+        root.addView(hrow)
         val lb = LinearLayout(act); lb.orientation = LinearLayout.VERTICAL
         listBox = lb
         val sc = ScrollView(act); sc.addView(lb)
@@ -229,8 +238,12 @@ class SoundsPage(
         for (i in 0 until row.childCount) {
             val c = row.getChildAt(i) as TextView
             val sel = i == cat
-            c.setTextColor(if (sel) Color.BLACK else Color.WHITE)
-            c.background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(if (sel) CYAN else 0xFF2A2A2E.toInt()) }
+            @Suppress("UNCHECKED_CAST")
+            val g = c.tag as Pair<GradientDrawable.Orientation, IntArray>
+            c.background = GradientDrawable(g.first, g.second).apply {
+                cornerRadius = dp(10).toFloat()
+                if (sel) setStroke(dp(2), CYAN)
+            }
         }
     }
 
@@ -247,12 +260,16 @@ class SoundsPage(
         if (tab == 0 && error != null && results.isEmpty()) {
             lb.addView(note(error!!))
             lb.addView(pill("Try again") { search(true) })
+            lb.addView(pill("Use a Jamendo Client ID") { sourceDialog() })
             return
         }
-        if (list.isEmpty()) { lb.addView(note(if (tab == 1) "Tap the bookmark on a track to save it here." else "No music found. Try another word.")); return }
+        if (list.isEmpty()) {
+            lb.addView(note(if (tab == 1) "Tap the bookmark on a track to save it here." else "No music found. Try another word, or tap More music for a bigger catalogue."))
+            return
+        }
         list.forEach { lb.addView(row(it)) }
         if (tab == 0 && hasMore) lb.addView(pill(if (loading) "Loading..." else "Load more") { if (!loading) { page++; search(false) } })
-        lb.addView(note("Free music from Openverse (Creative Commons). Check each track's licence tag; tracks that need credit are listed in Audio > Copyright."))
+        lb.addView(note("Free music (Creative Commons). Check each track's licence tag; tracks that need credit are listed in Audio > Copyright."))
     }
 
     private fun note(s: String) = TextView(act).apply { text = s; setTextColor(0xFF8A8A92.toInt()); textSize = 13f; setPadding(0, dp(14), 0, dp(14)) }
@@ -419,6 +436,8 @@ class SoundsPage(
         if (tab != 0) { render(); return }
         loading = true; error = null
         render()
+        val jid = jamendoId()
+        if (jid.isNotBlank()) { searchJamendo(jid); return }
         val q = if (query.isBlank()) "instrumental" else query
         val url = "https://api.openverse.org/v1/audio/?q=" + URLEncoder.encode(q, "UTF-8") +
             "&category=music&page_size=20&page=$page" + (if (commercial) "&license_type=commercial" else "")
@@ -432,10 +451,11 @@ class SoundsPage(
                     val r = arr.getJSONObject(i)
                     val u = r.str("url")
                     if (!u.startsWith("http")) continue
-                    val ft = r.str("filetype").lowercase().ifBlank { u.substringAfterLast('.', "mp3").take(4).lowercase() }
-                    if (ft !in listOf("mp3", "mpeg", "ogg", "oga", "opus", "wav", "m4a", "aac", "flac")) continue
-                    list.add(Track(r.str("id"), r.str("title"), r.str("creator"), u, r.str("thumbnail").takeIf { it.startsWith("http") },
-                        r.optLong("duration", 0L), r.str("license"), r.str("license_version"), r.str("foreign_landing_url"), if (ft == "mpeg") "mp3" else ft))
+                    val ft = r.str("filetype").lowercase()
+                    val ext = Regex("\\.(mp3|ogg|oga|opus|wav|m4a|aac|flac)(\\?|$)", RegexOption.IGNORE_CASE).find(u)?.groupValues?.get(1)?.lowercase()
+                        ?: (if (ft == "mpeg" || ft.isBlank()) "mp3" else ft)
+                    list.add(Track(r.str("id").ifBlank { u.hashCode().toString() }, r.str("title"), r.str("creator"), u, r.str("thumbnail").takeIf { it.startsWith("http") },
+                        r.optLong("duration", 0L), r.str("license"), r.str("license_version"), r.str("foreign_landing_url"), ext))
                 }
                 val count = arr.length()
                 ui.post { if (my == searchGen) { results.addAll(list); hasMore = count >= 20; loading = false; render() } }
@@ -447,6 +467,65 @@ class SoundsPage(
     }
 
     private var searchGen = 0
+
+    private fun jamendoId() = prefs.getString("jamendo_id", "")?.trim() ?: ""
+
+    /** Jamendo: a big catalogue of free (Creative Commons) music with real "trending" charts. Needs a free client ID. */
+    private fun searchJamendo(id: String) {
+        val my = ++searchGen
+        val sb = StringBuilder("https://api.jamendo.com/v3.0/tracks/?client_id=").append(URLEncoder.encode(id, "UTF-8"))
+            .append("&format=json&limit=20&offset=").append((page - 1) * 20).append("&imagesize=200&audioformat=mp32&include=licenses")
+        val isCat = cat > 0 && query.isNotBlank()
+        when {
+            query.isBlank() -> sb.append("&order=popularity_week")
+            isCat -> sb.append("&order=popularity_month&fuzzytags=").append(URLEncoder.encode(query.lowercase().replace(" ", "+"), "UTF-8"))
+            else -> sb.append("&order=relevance&search=").append(URLEncoder.encode(query, "UTF-8"))
+        }
+        pool.execute {
+            try {
+                val text = open(sb.toString()).inputStream.bufferedReader().use { it.readText() }
+                val o = JSONObject(text)
+                val hdr = o.optJSONObject("headers")
+                if (hdr != null && hdr.optString("status") == "failed") throw java.io.IOException("jamendo: " + hdr.optString("error_message"))
+                val arr = o.optJSONArray("results") ?: JSONArray()
+                val list = mutableListOf<Track>()
+                for (i in 0 until arr.length()) {
+                    val r = arr.getJSONObject(i)
+                    val u = r.str("audio").ifBlank { r.str("audiodownload") }
+                    if (!u.startsWith("http")) continue
+                    val cc = r.str("license_ccurl")
+                    val seg = cc.substringAfter("/licenses/", "").trim('/').split("/")
+                    val lic = seg.getOrNull(0) ?: ""; val ver = seg.getOrNull(1) ?: ""
+                    val t = Track(r.str("id"), r.str("name"), r.str("artist_name"), u, r.str("image").takeIf { it.startsWith("http") },
+                        r.optLong("duration", 0L) * 1000L, lic, ver, r.str("shareurl"), "mp3")
+                    if (commercial && !t.commercialOk) continue
+                    list.add(t)
+                }
+                val count = arr.length()
+                ui.post { if (my == searchGen) { results.addAll(list); hasMore = count >= 20; loading = false; render() } }
+            } catch (e: Exception) {
+                val m = e.message ?: ""
+                ui.post { if (my == searchGen) { loading = false; error = if (m.startsWith("jamendo")) "Jamendo said: " + m.removePrefix("jamendo: ") + "\nCheck your Client ID (More music)." else "Could not load music. Check your internet connection."; render() } }
+            }
+        }
+    }
+
+    private fun sourceDialog() {
+        val input = EditText(act).apply {
+            hint = "Jamendo Client ID"; setText(jamendoId()); isSingleLine = true; setTextColor(Color.WHITE); setHintTextColor(0xFF77777F.toInt())
+            setPadding(dp(14), 0, dp(14), 0)
+            background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(0xFF2A2A2E.toInt()) }
+        }
+        val msg = TextView(act).apply {
+            setTextColor(0xFFC8C8CE.toInt()); textSize = 13f; setPadding(0, 0, 0, dp(12))
+            text = "Get Cut finds free music from Openverse. For a much bigger catalogue with real weekly Trending charts, add a free Jamendo Client ID:\n\n1. Open devportal.jamendo.com and sign up (free)\n2. Create an application\n3. Copy the Client ID and paste it below\n\nLeave it empty to use Openverse."
+        }
+        val box = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(16), dp(20), 0) }
+        box.addView(msg); box.addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46)))
+        android.app.AlertDialog.Builder(act).setTitle("More music").setView(box)
+            .setPositiveButton("Save") { _, _ -> prefs.edit().putString("jamendo_id", input.text.toString().trim()).apply(); query = ""; cat = 0; refreshChips(); search(true) }
+            .setNegativeButton("Cancel", null).show()
+    }
 
     private fun addTrack(t: Track) {
         if (adding) return
