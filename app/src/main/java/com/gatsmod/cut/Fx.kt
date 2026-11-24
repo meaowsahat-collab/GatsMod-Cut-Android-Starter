@@ -131,7 +131,7 @@ object Fx {
         }
         if (!(live && android.os.Build.VERSION.SDK_INT >= 31) && c.blur > 0.1f) l.add(GaussianBlur(c.blur.coerceAtMost(25f)))
         if (live) {
-            l.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f, null, c)))
+            l.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f, c)))
         } else if (c.fx != 0 || c.maskShape != 0) {
             l.add(LookGlEffect(LookParams(c.fx, c.fxAmount, c.maskShape, c.maskSize, c.maskFeather, c.maskInvert, c.maskX, c.maskY)))
         }

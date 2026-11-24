@@ -23,10 +23,10 @@ class LookParams(
     val maskInvert: Boolean,
     val maskX: Float,
     val maskY: Float,
-    /** Optional: gives [shape, size] of the mask for a frame time (microseconds) — used by the reveal animations. */
-    val dyn: ((Long) -> FloatArray)? = null,
     /** Optional: when set, every value above is re-read from this clip on each frame (live slider preview). */
-    val live: Clip? = null
+    val live: Clip? = null,
+    /** Optional: gives [shape, size] of the mask for a frame time (microseconds) — used by the reveal animations. */
+    val dyn: ((Long) -> FloatArray)? = null
 )
 
 object GlFxNames {
