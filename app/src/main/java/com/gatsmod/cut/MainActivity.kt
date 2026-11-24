@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
     private var resShort = 1080
     private var fps = 30
     private var quality = 1f
+    private var bitrateMbps = 0f   // 0 = recommended
     private var fullscreen = false
 
     private val videoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { u -> u?.let { loadVideo(it) } }
@@ -1299,32 +1300,136 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.resChip).text = "$base ▾"
     }
 
+    /** Full-page export settings in the theme colours: Resolution, Frame rate and Bitrate sliders, estimated size, Export. */
     private fun exportSettingsDialog() {
-        val sizes = listOf(480, 720, 1080, 1440, 2160)
-        val opts = listOf(24, 30, 60)
-        val qs = floatArrayOf(0.6f, 1f, 1.6f, 2.5f)
-        val info = TextView(this)
-        info.setTextColor(0xFFFFD54F.toInt())
-        info.textSize = 13f
-        info.setPadding(0, dp(8), 0, dp(4))
+        val tone = EditorTheme.current(this)
+        val acc = tone.accent
+        val d = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(tone.panel)
+        root.setPadding(dp(20), dp(34), dp(20), dp(16))
+
+        val resStops = listOf(480, 720, 1080, 1440, 2160)
+        val resNames = listOf("480p", "720p", "1080p", "2K", "4K")
+        val fpsStops = listOf(24, 25, 30, 50, 60)
+        val sizeText = TextView(this)
+        val hintRes = TextView(this)
+        val hintBr = TextView(this)
+        val brValue = TextView(this)
+
+        fun recommended(): Float = exporter.bitrateFor(ExportSettings(resShort, fps, 1f, 0f)) / 1e6f
+        fun effBr(): Float = if (bitrateMbps > 0f) bitrateMbps else recommended()
         fun upd() {
             val sz = exporter.outputSize(project, resShort)
-            val br = exporter.bitrateFor(ExportSettings(resShort, fps, quality))
+            val br = effBr()
             val sec = (project.totalMs() / 1000L).coerceAtLeast(1L)
-            val mb = br / 8.0 * sec / 1_000_000.0 + sec * 0.016
-            info.text = "Output: ${sz.width}×${sz.height} · $fps fps · ${"%.1f".format(br / 1e6)} Mbps · about ${"%.0f".format(mb)} MB"
+            val mb = br / 8.0 * sec + sec * 0.016
+            sizeText.text = "Estimated file size: ${"%.0f".format(mb)} MB  ·  ${sz.width}×${sz.height}"
+            hintBr.text = if (bitrateMbps > 0f) "Custom: ${"%.0f".format(bitrateMbps)} Mbps" else "Recommended for this video (${"%.0f".format(recommended())})"
+            hintRes.text = when { resShort >= 2160 -> "Ultra – needs a strong phone"; resShort >= 1440 -> "Very sharp"; resShort >= 1080 -> "High definition"; resShort >= 720 -> "Standard definition"; else -> "Small file, lower quality" }
+            refreshRes()
         }
+
+        fun title(t: String, hint: TextView): View {
+            val row = LinearLayout(this)
+            row.gravity = Gravity.CENTER_VERTICAL
+            val tv = TextView(this); tv.text = t; tv.setTextColor(Color.WHITE); tv.textSize = 18f
+            row.addView(tv, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            hint.setTextColor(0xFF9A9AA2.toInt()); hint.textSize = 13f
+            row.addView(hint)
+            return row
+        }
+        fun labelsRow(names: List<String>): View {
+            val row = LinearLayout(this)
+            names.forEachIndexed { i, n ->
+                val tv = TextView(this); tv.text = n; tv.setTextColor(0xFFB5B5BC.toInt()); tv.textSize = 14f
+                tv.gravity = when (i) { 0 -> Gravity.START; names.lastIndex -> Gravity.END; else -> Gravity.CENTER_HORIZONTAL }
+                row.addView(tv, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            }
+            return row
+        }
+        fun styled(sb: SeekBar) {
+            sb.progressTintList = android.content.res.ColorStateList.valueOf(acc)
+            sb.thumbTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+            sb.progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0x55FFFFFF)
+        }
+        fun stepSeek(count: Int, start: Int, onPick: (Int) -> Unit): SeekBar {
+            val sb = SeekBar(this)
+            sb.max = count - 1
+            sb.progress = start
+            styled(sb)
+            sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) { if (u) onPick(p) }
+                override fun onStartTrackingTouch(s: SeekBar?) {}
+                override fun onStopTrackingTouch(s: SeekBar?) {}
+            })
+            return sb
+        }
+
+        // header
+        val head = LinearLayout(this)
+        head.gravity = Gravity.CENTER_VERTICAL
+        val ht = TextView(this); ht.text = "video"; ht.setTextColor(Color.WHITE); ht.textSize = 24f
+        head.addView(ht, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val close = TextView(this); close.text = "Done"; close.setTextColor(acc); close.textSize = 17f
+        close.setPadding(dp(10), dp(8), dp(18), dp(8)); close.setOnClickListener { d.dismiss() }
+        head.addView(close)
+        val exp = TextView(this); exp.text = "Export"; exp.setTextColor(0xFF111111.toInt()); exp.textSize = 17f; exp.setTypeface(null, Typeface.BOLD)
+        exp.gravity = Gravity.CENTER; exp.setPadding(dp(24), dp(10), dp(24), dp(10))
+        val eg = GradientDrawable(); eg.cornerRadius = dp(10).toFloat(); eg.setColor(acc); exp.background = eg
+        exp.setOnClickListener { d.dismiss(); startExport() }
+        head.addView(exp)
+        root.addView(head)
+        val ul = View(this); ul.setBackgroundColor(acc)
+        root.addView(ul, LinearLayout.LayoutParams(dp(60), dp(3)).also { it.topMargin = dp(6) })
+
+        root.addView(title("Resolution", hintRes), LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(34) })
+        root.addView(stepSeek(resStops.size, resStops.indexOf(resShort).coerceAtLeast(0)) { resShort = resStops[it]; upd() }, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(10) })
+        root.addView(labelsRow(resNames))
+
+        val fpsHint = TextView(this); fpsHint.text = "Smoother playback"
+        root.addView(title("Frame rate", fpsHint), LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(34) })
+        root.addView(stepSeek(fpsStops.size, fpsStops.indexOf(fps).coerceAtLeast(0)) { fps = fpsStops[it]; upd() }, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(10) })
+        root.addView(labelsRow(fpsStops.map { it.toString() }))
+        val fpsNote = TextView(this); fpsNote.setTextColor(0xFF77777F.toInt()); fpsNote.textSize = 12f
+        fpsNote.text = "A frame rate higher than your video's own is not added; frames are only dropped."
+        root.addView(fpsNote, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(6) })
+
+        root.addView(title("Bitrate (Mbps)", hintBr), LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(30) })
+        val brBar = SeekBar(this)
+        brBar.max = 95
+        styled(brBar)
+        brBar.progress = (effBr() - 5f).toInt().coerceIn(0, 95)
+        brBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
+                if (!u) return
+                bitrateMbps = (p + 5).toFloat()
+                upd()
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) {}
+        })
+        root.addView(brBar, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(10) })
+        root.addView(labelsRow(listOf("5", "10", "20", "50", "100")))
+        val reset = TextView(this); reset.text = "Use recommended bitrate"; reset.setTextColor(acc); reset.textSize = 14f
+        reset.setPadding(0, dp(12), 0, dp(4))
+        reset.setOnClickListener { bitrateMbps = 0f; brBar.progress = (recommended() - 5f).toInt().coerceIn(0, 95); upd() }
+        root.addView(reset)
+
+        root.addView(View(this), LinearLayout.LayoutParams(-1, 0, 1f))
+        val line = View(this); line.setBackgroundColor(0x33FFFFFF)
+        root.addView(line, LinearLayout.LayoutParams(-1, 1))
+        sizeText.setTextColor(0xFFB5B5BC.toInt()); sizeText.textSize = 14f; sizeText.gravity = Gravity.CENTER
+        root.addView(sizeText, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(12) })
+        val note = TextView(this); note.setTextColor(0xFF77777F.toInt()); note.textSize = 11f; note.gravity = Gravity.CENTER
+        note.text = "2K / 4K depend on what your phone's video encoder supports."
+        root.addView(note, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(4) })
+
         upd()
-        sheet("Export settings",
-            label("Resolution"),
-            chips(listOf("480P", "720P", "1080P", "2K", "4K"), sizes.indexOf(resShort)) { resShort = sizes[it]; refreshRes(); upd() },
-            label("Frame rate"),
-            chips(opts.map { "$it fps" }, opts.indexOf(fps)) { fps = opts[it]; refreshRes(); upd() },
-            label("Quality (bitrate)"),
-            chips(listOf("Low", "Standard", "High", "Max"), qs.indexOfFirst { it == quality }) { quality = qs[it]; upd() },
-            info,
-            label("Higher quality gives a sharper video and a bigger file. Frames are only dropped, never invented: a 30 fps video stays 30 fps even if you pick 60."),
-            label("2K / 4K export depends on what your phone's video encoder supports."))
+        d.setContentView(root)
+        d.window?.let { w -> w.statusBarColor = tone.panel; w.navigationBarColor = tone.panel }
+        d.show()
     }
 
     // ============================================================ edit tools
@@ -2899,7 +3004,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         ui.post(poll)
-        exporter.start(project, ExportSettings(resShort, fps, quality), object : Exporter.Callback {
+        exporter.start(project, ExportSettings(resShort, fps, quality, bitrateMbps), object : Exporter.Callback {
             override fun onDone(file: File) {
                 finished = true
                 Thread {

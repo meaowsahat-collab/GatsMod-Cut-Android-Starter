@@ -10,16 +10,16 @@ import android.widget.TextView
 
 /** Two-tone editor look: black preview area, coloured top bar + bottom (controls/timeline/toolbar) area. */
 object EditorTheme {
-    class Tone(val name: String, val panel: Int, val timeline: Int)
+    class Tone(val name: String, val panel: Int, val timeline: Int, val accent: Int = 0xFFFFB300.toInt())
 
     val TONES = listOf(
-        Tone("Graphite", 0xFF232327.toInt(), 0xFF1A1A1E.toInt()),
-        Tone("Midnight", 0xFF18203A.toInt(), 0xFF111729.toInt()),
-        Tone("Purple", 0xFF2A1D42.toInt(), 0xFF1E1431.toInt()),
-        Tone("Forest", 0xFF173226.toInt(), 0xFF10231A.toInt()),
-        Tone("Maroon", 0xFF3A1A1F.toInt(), 0xFF2A1216.toInt()),
-        Tone("Ocean", 0xFF123238.toInt(), 0xFF0C2428.toInt()),
-        Tone("Black", 0xFF0A0A0C.toInt(), 0xFF0D0D10.toInt())
+        Tone("Graphite", 0xFF232327.toInt(), 0xFF1A1A1E.toInt(), 0xFFFFB300.toInt()),
+        Tone("Midnight", 0xFF18203A.toInt(), 0xFF111729.toInt(), 0xFF64B5F6.toInt()),
+        Tone("Purple", 0xFF2A1D42.toInt(), 0xFF1E1431.toInt(), 0xFFE040FB.toInt()),
+        Tone("Forest", 0xFF173226.toInt(), 0xFF10231A.toInt(), 0xFF69F0AE.toInt()),
+        Tone("Maroon", 0xFF3A1A1F.toInt(), 0xFF2A1216.toInt(), 0xFFFF8A80.toInt()),
+        Tone("Ocean", 0xFF123238.toInt(), 0xFF0C2428.toInt(), 0xFF4DD0E1.toInt()),
+        Tone("Black", 0xFF0A0A0C.toInt(), 0xFF0D0D10.toInt(), 0xFF25F4EE.toInt())
     )
 
     private fun prefs(c: Context) = c.getSharedPreferences("theme", Context.MODE_PRIVATE)
