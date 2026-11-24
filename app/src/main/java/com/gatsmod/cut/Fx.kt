@@ -98,7 +98,6 @@ object Fx {
         }
         if (c.cropRatio > 0f) l.add(AspectCrop(c.cropRatio))
         if (c.chroma.enabled) l.add(ChromaLut.create(c.chroma))
-        if (live) l.add(LiveColorEffect(c))
         if (!live && abs(c.brightness) > 0.001f) l.add(Brightness(c.brightness.coerceIn(-1f, 1f)))
         if (!live && abs(c.contrast - 1f) > 0.001f) l.add(Contrast((c.contrast - 1f).coerceIn(-1f, 1f)))
         if (!live && abs(c.temp) > 0.01f) {

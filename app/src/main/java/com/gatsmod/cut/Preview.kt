@@ -230,7 +230,13 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     fun setLive(id: Any?) { liveId = id; applyLook(true) }
 
     /** Re-draws the paused frame (after a live slider change). */
-    fun redraw() { if (!player.isPlaying && project.main.isNotEmpty()) seekTo(playheadMs) }
+    private var flip = false
+    fun redraw() {
+        if (player.isPlaying || project.main.isEmpty()) return
+        // a real 1 ms seek (alternating +1 / -1, so no drift) forces the decoder to deliver a fresh frame through the effects
+        flip = !flip
+        seekTo(if (flip) playheadMs + 1 else playheadMs - 1)
+    }
 
     /** Applies speed, volume and effects of the clip under the playhead. */
     private fun applyLook(force: Boolean) {

@@ -102,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         engine = PreviewEngine(this, project)
 
         val pv = findViewById<PlayerView>(R.id.playerView)
+        gradeView = pv
         pv.player = engine.player
         engine.onPlayerReplaced = { p -> pv.player = p }
         timeline = findViewById(R.id.timeline)
@@ -630,11 +631,45 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private var gradeView: PlayerView? = null
+    private var gradeClip: Clip? = null
+
+    /** Instant colour grade on the preview picture itself (no decoder involved), so sliders react while the finger moves. */
+    private fun applyGrade(c: Clip?) {
+        val tv = gradeView?.videoSurfaceView as? android.view.TextureView ?: return
+        if (c == null) { tv.setLayerPaint(null); return }
+        val cm = android.graphics.ColorMatrix()
+        fun add(m: android.graphics.ColorMatrix) = cm.postConcat(m)
+        fun mat(vararg v: Float) = android.graphics.ColorMatrix(v)
+        val b = c.brightness * 255f
+        add(mat(1f, 0f, 0f, 0f, b, 0f, 1f, 0f, 0f, b, 0f, 0f, 1f, 0f, b, 0f, 0f, 0f, 1f, 0f))
+        val k = c.contrast; val o = 127.5f * (1f - k)
+        add(mat(k, 0f, 0f, 0f, o, 0f, k, 0f, 0f, o, 0f, 0f, k, 0f, o, 0f, 0f, 0f, 1f, 0f))
+        add(mat(1f + 0.25f * c.temp, 0f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 0f, 1f - 0.25f * c.temp, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+        val sm = android.graphics.ColorMatrix(); sm.setSaturation(c.saturation.coerceAtLeast(0f)); add(sm)
+        if (abs(c.hue) > 0.01f) {
+            val a = Math.toRadians(c.hue.toDouble()); val cs = Math.cos(a).toFloat(); val sn = Math.sin(a).toFloat()
+            val lr = 0.213f; val lg = 0.715f; val lb = 0.072f
+            add(mat(
+                lr + cs * (1 - lr) + sn * -lr, lg + cs * -lg + sn * -lg, lb + cs * -lb + sn * (1 - lb), 0f, 0f,
+                lr + cs * -lr + sn * 0.143f, lg + cs * (1 - lg) + sn * 0.14f, lb + cs * -lb + sn * -0.283f, 0f, 0f,
+                lr + cs * -lr + sn * -(1 - lr), lg + cs * -lg + sn * lg, lb + cs * (1 - lb) + sn * lb, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f))
+        }
+        val ll = (c.lum / 100f).coerceIn(-1f, 1f)
+        if (ll != 0f) { val kk = 1f - abs(ll); val oo = if (ll > 0f) 255f * ll else 0f
+            add(mat(kk, 0f, 0f, 0f, oo, 0f, kk, 0f, 0f, oo, 0f, 0f, kk, 0f, oo, 0f, 0f, 0f, 1f, 0f)) }
+        val e = Math.pow(2.0, c.exposure.toDouble() * 0.8).toFloat()
+        add(mat(e * (1f + 0.12f * c.tint), 0f, 0f, 0f, 0f, 0f, e * (1f - 0.2f * c.tint), 0f, 0f, 0f, 0f, 0f, e * (1f + 0.12f * c.tint), 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+        tv.setLayerPaint(android.graphics.Paint().apply { colorFilter = android.graphics.ColorMatrixColorFilter(cm) })
+    }
+
     private var liveLast = 0L
     private val liveRun = Runnable { liveLast = android.os.SystemClock.uptimeMillis(); engine.refresh(); timeline.invalidate() }
 
     /** Slider changes while dragging: update about 4 times a second (not only after the finger lifts). */
     private fun live() {
+        gradeClip?.let { applyGrade(it) }
         ui.removeCallbacks(liveRun)
         val wait = 250L - (android.os.SystemClock.uptimeMillis() - liveLast)
         if (wait <= 0L) liveRun.run() else ui.postDelayed(liveRun, wait)
@@ -645,6 +680,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Colour sliders: the picture changes while the finger moves (frame redrawn at most every 50 ms). */
     private fun liveColor() {
+        gradeClip?.let { applyGrade(it) }
         ui.removeCallbacks(redrawRun)
         val wait = 50L - (android.os.SystemClock.uptimeMillis() - redrawLast)
         if (wait <= 0L) redrawRun.run() else ui.postDelayed(redrawRun, wait)
@@ -1841,6 +1877,8 @@ class MainActivity : AppCompatActivity() {
         d.setContentView(root)
         d.setOnDismissListener {
             engine.setLive(null)
+            gradeClip = null
+            ui.postDelayed({ if (gradeClip == null) applyGrade(null) }, 500)
             if (c.paramSig() == before) project.discardCheckpoint()
             afterEdit()
         }
@@ -1852,6 +1890,8 @@ class MainActivity : AppCompatActivity() {
         }
         show(startTab)
         d.show()
+        gradeClip = c
+        applyGrade(c)
         engine.setLive(c.id)
     }
 
