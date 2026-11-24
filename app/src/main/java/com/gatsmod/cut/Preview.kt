@@ -45,26 +45,40 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
 
     /** ExoPlayer whose audio output runs through the noise reducer when [denoise] > 0. */
     private fun buildPlayer(denoise: Float): ExoPlayer {
-        if (denoise <= 0f) return ExoPlayer.Builder(ctx).build()
         val factory = object : androidx.media3.exoplayer.DefaultRenderersFactory(ctx) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): androidx.media3.exoplayer.audio.AudioSink? =
-                androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                if (denoise <= 0f) super.buildAudioSink(context, enableFloatOutput, enableAudioTrackPlaybackParams)
+                else androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(false)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .setAudioProcessors(arrayOf<androidx.media3.common.audio.AudioProcessor>(DenoiseProcessor(denoise)))
                     .build()
         }
+        factory.setEnableDecoderFallback(true)
         return ExoPlayer.Builder(ctx, factory).build()
     }
 
+    private var lastEffects: List<androidx.media3.common.Effect> = emptyList()
+    private var decoderRetries = 0
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) decoderRetries = 0
             if (!isPlaying) audioPlayer.pause()
             listener?.onPlayingChanged(isPlaying)
         }
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             // Never leave the preview dead: report it, drop the preview effects and restart playback.
+            val code = error.errorCode
+            // the phone ran out of hardware decoders for a moment: wait, then start again with the same look
+            if ((code == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                    code == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED) && decoderRetries < 3) {
+                decoderRetries++
+                handler.postDelayed({ rebuild(lastEffects) }, 400L * decoderRetries)
+                return
+            }
             val why = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.distinct().joinToString(" / ").take(160)
             listener?.onProblem("Preview problem: ${error.errorCodeName} $why".trim())
             if (effectsOk) {
@@ -188,6 +202,10 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val pos = ((playheadMs - c.startMs).coerceAtLeast(0L) * c.speed).toLong()
         val play = player.playWhenReady
         val old = player
+        lastEffects = effects
+        // free the old player's hardware decoder BEFORE the new one asks for one (phones have only a few)
+        old.removeListener(playerListener)
+        old.release()
         val fresh = buildPlayer(c.denoise)
         // no effects -> do not touch the GL frame pipeline at all (plain, most compatible playback path)
         if (effects.isNotEmpty()) try {
@@ -205,8 +223,6 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         fresh.playWhenReady = play
         player = fresh
         onPlayerReplaced?.invoke(fresh)
-        old.removeListener(playerListener)
-        old.release()
     }
 
     /** Applies speed, volume and effects of the clip under the playhead. */
