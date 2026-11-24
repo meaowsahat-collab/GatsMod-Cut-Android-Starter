@@ -445,7 +445,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun audioTools(): List<T> = listOf(
         T(R.drawable.ic_folder, "Extract") { if (project.isEmpty()) toast("Import a video first") else { toast("Pick a video - its sound is added to the audio track"); extractPicker.launch(arrayOf("video/*")) } },
-        T(R.drawable.ic_music, "Sounds") { audioPicker.launch(arrayOf("audio/*")) },
+        T(R.drawable.ic_music, "Sounds") { if (project.isEmpty()) toast("Import a video first") else SoundsPage(this, { uri, dur, label -> addAudioClip(uri, dur, label) }, { audioPicker.launch(arrayOf("audio/*")) }).show() },
         T(R.drawable.ic_soundfx, "Sound FX") { soundLibraryDialog(false) },
         T(R.drawable.ic_mic, "Record") { startVoiceover() },
         T(R.drawable.ic_tts, "Text to audio") { ttsDialog() },
@@ -565,8 +565,15 @@ class MainActivity : AppCompatActivity() {
         if (project.audio.isEmpty()) sb.append("There is no music or sound in the audio track yet.\n\n")
         else project.audio.forEach {
             val safe = SoundGen.isBuiltIn(it.uri) || it.uri.contains("/tts/") || it.uri.contains("/voice")
-            sb.append(if (safe) "✔ " else "? ").append(it.label.ifBlank { "Audio" }).append("\n   ")
-              .append(if (safe) "Made inside Get Cut or by you - safe to publish." else "Your own file - Get Cut cannot check it.").append("\n\n")
+            val cr = SoundsPage.creditFor(this, it.uri)
+            val mark = if (cr != null) (if (cr.commercialOk) "✔ " else "⚠ ") else if (safe) "✔ " else "? "
+            val msg = when {
+                cr != null -> cr.licenseName + (if (!cr.commercialOk) " - NOT for monetised videos. " else " - free to use. ") +
+                    (if (cr.needsCredit) "Credit required, put in your description: \"${cr.title}\" by ${cr.creator.ifBlank { "the artist" }} (${cr.licenseName})" + (if (cr.landing.isNotBlank()) " ${cr.landing}" else "") else "No credit needed.")
+                safe -> "Made inside Get Cut or by you - safe to publish."
+                else -> "Your own file - Get Cut cannot check it."
+            }
+            sb.append(mark).append(it.label.ifBlank { "Audio" }).append("\n   ").append(msg).append("\n\n")
         }
         sb.append("Get Cut has no online music database, so it cannot detect copyrighted songs like CapCut does. ")
             .append("Sounds from Sound FX, Brand music, Text to audio and your own recordings are safe. Songs from films, apps or the radio can get a video muted or blocked on YouTube, TikTok and Facebook.")
