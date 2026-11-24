@@ -47,9 +47,12 @@ class RemoveBg(private val blurBackground: Boolean, private val color: Int, priv
             val scaled = Bitmap.createScaledBitmap(crop, w, h, true)
             bg = IntArray(w * h); scaled.getPixels(bg, 0, w, 0, 0, w, h)
         }
+        // snap the soft mask to the real edges of the picture (guided filter on brightness)
+        val lum = FloatArray(w * h) { val c = px[it]; (0.299f * ((c shr 16) and 255) + 0.587f * ((c shr 8) and 255) + 0.114f * (c and 255)) / 255f }
+        val alpha = MaskMath.refine(m, mw, mh, lum, w, h, maxOf(4, maxOf(w, h) / 110), 0.0008f)
         for (y in 0 until h) for (x in 0 until w) {
-            val a = MaskMath.edge(MaskMath.sample(m, mw, mh, x, y, w, h))
             val i = y * w + x
+            val a = MaskMath.edge(alpha[i], 0.3f, 0.7f)
             if (a < 0.995f) px[i] = MaskMath.mix(px[i], bg?.get(i) ?: color, a)
         }
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)

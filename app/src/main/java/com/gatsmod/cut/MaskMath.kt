@@ -38,4 +38,56 @@ object MaskMath {
         val bl = ((a and 255) * ia + (b and 255) * ib) shr 8
         return (0xFF shl 24) or (min(255, r) shl 16) or (min(255, g) shl 8) or min(255, bl)
     }
+
+    /** Mean over a (2r+1)^2 window, using an integral image. */
+    fun boxMean(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
+        val iw = w + 1
+        val integ = DoubleArray(iw * (h + 1))
+        for (y in 0 until h) {
+            var row = 0.0
+            for (x in 0 until w) {
+                row += src[y * w + x]
+                integ[(y + 1) * iw + (x + 1)] = integ[y * iw + (x + 1)] + row
+            }
+        }
+        val out = FloatArray(w * h)
+        for (y in 0 until h) {
+            val y0 = max(0, y - r); val y1 = min(h, y + r + 1)
+            for (x in 0 until w) {
+                val x0 = max(0, x - r); val x1 = min(w, x + r + 1)
+                val sum = integ[y1 * iw + x1] - integ[y0 * iw + x1] - integ[y1 * iw + x0] + integ[y0 * iw + x0]
+                out[y * w + x] = (sum / ((x1 - x0) * (y1 - y0))).toFloat()
+            }
+        }
+        return out
+    }
+
+    /** Guided filter (He et al.): makes [p] follow the edges of the picture [guide]. */
+    fun guided(guide: FloatArray, p: FloatArray, w: Int, h: Int, r: Int, eps: Float): FloatArray {
+        val n = w * h
+        val meanI = boxMean(guide, w, h, r)
+        val meanP = boxMean(p, w, h, r)
+        val ii = FloatArray(n) { guide[it] * guide[it] }
+        val ip = FloatArray(n) { guide[it] * p[it] }
+        val corrI = boxMean(ii, w, h, r)
+        val corrIp = boxMean(ip, w, h, r)
+        val a = FloatArray(n)
+        val b = FloatArray(n)
+        for (i in 0 until n) {
+            val v = corrI[i] - meanI[i] * meanI[i]
+            val c = corrIp[i] - meanI[i] * meanP[i]
+            a[i] = c / (v + eps)
+            b[i] = meanP[i] - a[i] * meanI[i]
+        }
+        val ma = boxMean(a, w, h, r)
+        val mb = boxMean(b, w, h, r)
+        return FloatArray(n) { (ma[it] * guide[it] + mb[it]).coerceIn(0f, 1f) }
+    }
+
+    /** Stretches the mask to the picture size and snaps its edge to the picture's own edges. Returns a w x h alpha. */
+    fun refine(mask: FloatArray, mw: Int, mh: Int, lum: FloatArray, w: Int, h: Int, radius: Int, eps: Float): FloatArray {
+        val up = FloatArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) up[y * w + x] = sample(mask, mw, mh, x, y, w, h)
+        return guided(lum, up, w, h, radius, eps)
+    }
 }
