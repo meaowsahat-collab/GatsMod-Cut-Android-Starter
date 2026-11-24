@@ -629,9 +629,25 @@ class MainActivity : AppCompatActivity() {
         project.checkpoint()
         val before = c.paramSig()
         sheet(title, *views, onClose = {
+            endLive()
             if (c.paramSig() == before) project.discardCheckpoint()
             afterEdit()
         })
+        beginLive(c)
+    }
+
+    /** While a sheet with sliders is open: changes show on the picture instantly instead of after closing. */
+    private fun beginLive(c: Clip) {
+        if (project.mainClipAt(engine.playheadMs)?.id != c.id) return
+        gradeClip = c
+        applyGrade(c)
+        engine.setLive(c.id)
+    }
+
+    private fun endLive() {
+        engine.setLive(null)
+        gradeClip = null
+        ui.postDelayed({ if (gradeClip == null) applyGrade(null) }, 500)
     }
 
     private var gradeView: PlayerView? = null
@@ -640,7 +656,15 @@ class MainActivity : AppCompatActivity() {
     /** Instant colour grade on the preview picture itself (no decoder involved), so sliders react while the finger moves. */
     private fun applyGrade(c: Clip?) {
         val tv = gradeView?.videoSurfaceView as? android.view.TextureView ?: return
-        if (c == null) { tv.setLayerPaint(null); return }
+        if (c == null) {
+            tv.setLayerPaint(null)
+            if (android.os.Build.VERSION.SDK_INT >= 31) tv.setRenderEffect(null)
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            if (c.blur > 0.1f) { val r = (c.blur * 0.7f).coerceAtLeast(0.1f); tv.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)) }
+            else tv.setRenderEffect(null)
+        }
         val cm = android.graphics.ColorMatrix()
         fun add(m: android.graphics.ColorMatrix) = cm.postConcat(m)
         fun mat(vararg v: Float) = android.graphics.ColorMatrix(v)
@@ -674,7 +698,7 @@ class MainActivity : AppCompatActivity() {
     private fun live() {
         gradeClip?.let { applyGrade(it) }
         ui.removeCallbacks(liveRun)
-        val wait = 250L - (android.os.SystemClock.uptimeMillis() - liveLast)
+        val wait = (if (gradeClip != null) 50L else 150L) - (android.os.SystemClock.uptimeMillis() - liveLast)
         if (wait <= 0L) liveRun.run() else ui.postDelayed(liveRun, wait)
     }
 
@@ -1879,9 +1903,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(236)))
         d.setContentView(root)
         d.setOnDismissListener {
-            engine.setLive(null)
-            gradeClip = null
-            ui.postDelayed({ if (gradeClip == null) applyGrade(null) }, 500)
+            endLive()
             if (c.paramSig() == before) project.discardCheckpoint()
             afterEdit()
         }
@@ -1893,9 +1915,7 @@ class MainActivity : AppCompatActivity() {
         }
         show(startTab)
         d.show()
-        gradeClip = c
-        applyGrade(c)
-        engine.setLive(c.id)
+        beginLive(c)
     }
 
     private fun filtersContent(c: Clip): View {
@@ -2277,7 +2297,8 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, st: Int, before: Int, count: Int) {}
         })
         rebuild()
-        sheet("Video effects", root, onClose = { if (c.paramSig() == before) project.discardCheckpoint(); afterEdit() })
+        sheet("Video effects", root, onClose = { endLive(); if (c.paramSig() == before) project.discardCheckpoint(); afterEdit() })
+        beginLive(c)
     }
 
     private fun maskDialog() {
@@ -2560,9 +2581,11 @@ class MainActivity : AppCompatActivity() {
 
         fillGrid()
         dlg = sheet("", tabRow, line, catScroll, searchBox, scroll, showHeader = false, heightPx = panelH, onClose = {
+            endLive()
             if (c.paramSig() == before) project.discardCheckpoint()
             afterEdit()
         })
+        beginLive(c)
     }
 
     private fun controlsRow(): View = findViewById(R.id.controls)

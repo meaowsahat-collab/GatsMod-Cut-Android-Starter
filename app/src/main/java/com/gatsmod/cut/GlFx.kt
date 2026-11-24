@@ -24,7 +24,9 @@ class LookParams(
     val maskX: Float,
     val maskY: Float,
     /** Optional: gives [shape, size] of the mask for a frame time (microseconds) — used by the reveal animations. */
-    val dyn: ((Long) -> FloatArray)? = null
+    val dyn: ((Long) -> FloatArray)? = null,
+    /** Optional: when set, every value above is re-read from this clip on each frame (live slider preview). */
+    val live: Clip? = null
 )
 
 object GlFxNames {
@@ -34,7 +36,7 @@ object GlFxNames {
 
 class LookGlEffect(private val p: LookParams) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = LookProgram(p, useHdr)
-    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = p.effect == 0 && p.mask == 0 && p.dyn == null
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = p.live == null && p.effect == 0 && p.mask == 0 && p.dyn == null
 }
 
 private class LookProgram(private val p: LookParams, useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
@@ -64,14 +66,15 @@ private class LookProgram(private val p: LookParams, useHdr: Boolean) : BaseGlSh
         try {
             program.use()
             program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)
-            program.setIntUniform("uEffect", p.effect)
-            program.setFloatUniform("uAmount", p.amount)
+            val lc = p.live
+            program.setIntUniform("uEffect", lc?.fx ?: p.effect)
+            program.setFloatUniform("uAmount", lc?.fxAmount ?: p.amount)
             val dm = p.dyn?.invoke(presentationTimeUs)
-            program.setIntUniform("uMask", dm?.get(0)?.toInt() ?: p.mask)
-            program.setFloatUniform("uMaskSize", dm?.get(1) ?: p.maskSize)
-            program.setFloatUniform("uMaskFeather", p.maskFeather)
-            program.setFloatUniform("uMaskInvert", if (p.maskInvert) 1f else 0f)
-            program.setFloatsUniform("uMaskPos", floatArrayOf(p.maskX * 0.5f, p.maskY * 0.5f))
+            program.setIntUniform("uMask", dm?.get(0)?.toInt() ?: lc?.maskShape ?: p.mask)
+            program.setFloatUniform("uMaskSize", dm?.get(1) ?: lc?.maskSize ?: p.maskSize)
+            program.setFloatUniform("uMaskFeather", lc?.maskFeather ?: p.maskFeather)
+            program.setFloatUniform("uMaskInvert", if (lc?.maskInvert ?: p.maskInvert) 1f else 0f)
+            program.setFloatsUniform("uMaskPos", floatArrayOf((lc?.maskX ?: p.maskX) * 0.5f, (lc?.maskY ?: p.maskY) * 0.5f))
             program.setFloatsUniform("uRes", floatArrayOf(w, h))
             program.setFloatUniform("uTime", ((presentationTimeUs / 1000L) % 100000L) / 1000f)
             program.bindAttributesAndUniforms()

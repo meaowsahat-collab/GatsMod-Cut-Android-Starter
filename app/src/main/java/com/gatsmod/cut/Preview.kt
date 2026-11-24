@@ -164,7 +164,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         } else {
             applyLook(true)
             // re-render the current frame so effect changes are visible while paused
-            if (project.main.isNotEmpty() && !player.isPlaying) seekTo(playheadMs)
+            if (project.main.isNotEmpty() && !player.isPlaying) { if (liveId != null) redraw() else seekTo(playheadMs) }
         }
         playheadMs = playheadMs.coerceIn(0L, max(0L, project.totalMs()))
         syncAudio(true)
@@ -258,9 +258,12 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         appliedKey = key
         val live = liveId != null && c.id == liveId
         fun lv(x: Float) = if (live) 0f else x
-        val fxKey = if (effectsOk) "$live|${c.id}|${c.filter}|${lv(c.brightness)}|${lv(c.contrast)}|${lv(c.saturation)}|${c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${lv(c.temp)}|${lv(c.hue)}|${lv(c.lum)}|${c.fx}|${c.fxAmount}|${c.maskShape}|${c.maskSize}|${c.maskFeather}|${c.maskInvert}|${c.maskX}|${c.maskY}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${c.animInMs}|${c.animOut}|${c.animOutMs}|${c.animCombo}|${c.textMotion}|${lv(c.exposure)}|${lv(c.tint)}|${lv(c.highlights)}|${lv(c.shadows)}|${lv(c.vibrance)}|${lv(c.fade)}|${lv(c.sharpen)}|${lv(c.vignette)}|${lv(c.grain)}|${if (c.hasAnim) c.lengthMs else 0L}|${c.fadeInMs}|${c.fadeOutMs}|${if (c.fadeInMs > 0 || c.fadeOutMs > 0) c.lengthMs else 0L}|" +
+        fun lvI(x: Int) = if (live) 0 else x
+        fun lvL(x: Long) = if (live) 0L else x
+        val blurLive = live && android.os.Build.VERSION.SDK_INT >= 31
+        val fxKey = if (effectsOk) "$live|${c.id}|${c.filter}|${lv(c.brightness)}|${lv(c.contrast)}|${lv(c.saturation)}|${if (blurLive) 0f else c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${lv(c.temp)}|${lv(c.hue)}|${lv(c.lum)}|${lvI(c.fx)}|${lv(c.fxAmount)}|${lvI(c.maskShape)}|${lv(c.maskSize)}|${lv(c.maskFeather)}|${live || c.maskInvert}|${lv(c.maskX)}|${lv(c.maskY)}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${lvL(c.animInMs)}|${c.animOut}|${lvL(c.animOutMs)}|${c.animCombo}|${c.textMotion}|${lv(c.exposure)}|${lv(c.tint)}|${lv(c.highlights)}|${lv(c.shadows)}|${lv(c.vibrance)}|${lv(c.fade)}|${lv(c.sharpen)}|${lv(c.vignette)}|${lv(c.grain)}|${if (c.hasAnim && !live) c.lengthMs else 0L}|${lvL(c.fadeInMs)}|${lvL(c.fadeOutMs)}|${if (!live && (c.fadeInMs > 0 || c.fadeOutMs > 0)) c.lengthMs else 0L}|" +
             "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
-            c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" } else "off"
+            (if (live) "" else c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }) else "off"
         if (fxKey != appliedFx) {
             val hadAny = appliedFx != "\u0000"
             appliedFx = fxKey

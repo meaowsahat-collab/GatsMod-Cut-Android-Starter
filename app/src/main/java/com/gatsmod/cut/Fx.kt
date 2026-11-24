@@ -129,8 +129,10 @@ object Fx {
         else if (c.highlights != 0f || c.shadows != 0f || c.vibrance != 0f || c.fade != 0f || c.sharpen != 0f || c.vignette != 0f || c.grain != 0f) {
             l.add(ToneGlEffect(floatArrayOf(c.highlights, c.shadows, c.vibrance, c.fade, c.sharpen, c.vignette, c.grain)))
         }
-        if (c.blur > 0.1f) l.add(GaussianBlur(c.blur.coerceAtMost(25f)))
-        if (c.fx != 0 || c.maskShape != 0) {
+        if (!(live && android.os.Build.VERSION.SDK_INT >= 31) && c.blur > 0.1f) l.add(GaussianBlur(c.blur.coerceAtMost(25f)))
+        if (live) {
+            l.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f, null, c)))
+        } else if (c.fx != 0 || c.maskShape != 0) {
             l.add(LookGlEffect(LookParams(c.fx, c.fxAmount, c.maskShape, c.maskSize, c.maskFeather, c.maskInvert, c.maskX, c.maskY)))
         }
         return l
@@ -140,16 +142,25 @@ object Fx {
     fun previewEffects(c: Clip, live: Boolean = false, localMs: () -> Long): List<Effect> {
         val l = lookEffects(c, live).toMutableList()
         if (c.stab.isNotEmpty()) l.add(KeyframeTransform(c.stab) { c.srcInMs + (localMs() * c.speed).toLong() })
-        if (c.hasAnim) {
+        if (c.hasAnim || live) {
             if (Anim.isMask(c.animIn) || Anim.isMask(c.animOut)) {
-                val ai = c.animIn; val aim = c.animInMs; val ao = c.animOut; val aom = c.animOutMs; val len = c.lengthMs
-                l.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f) { Anim.maskState(ai, aim, ao, aom, localMs(), len) }))
+                l.add(LookGlEffect(LookParams(0, 0f, 0, 1f, 0.08f, false, 0f, 0f) { Anim.maskState(c.animIn, c.animInMs, c.animOut, c.animOutMs, localMs(), c.lengthMs) }))
             }
-            l.add(AnimTransform(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
-            l.add(AnimGain(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
+            if (live) {
+                l.add(LiveAnimTransform(c) { localMs() })
+                l.add(LiveAnimGain(c) { localMs() })
+            } else {
+                l.add(AnimTransform(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
+                l.add(AnimGain(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, c.lengthMs) { localMs() })
+            }
         }
-        if (c.keyframes.isNotEmpty()) l.add(KeyframeTransform(c.keyframes) { localMs() })
-        if (c.fadeInMs > 0 || c.fadeOutMs > 0) l.add(FadeMatrix(c.fadeInMs, c.fadeOutMs, c.lengthMs) { localMs() })
+        if (live) {
+            l.add(LiveKeyframeTransform(c) { localMs() })
+            l.add(LiveFadeMatrix(c) { localMs() })
+        } else {
+            if (c.keyframes.isNotEmpty()) l.add(KeyframeTransform(c.keyframes) { localMs() })
+            if (c.fadeInMs > 0 || c.fadeOutMs > 0) l.add(FadeMatrix(c.fadeInMs, c.fadeOutMs, c.lengthMs) { localMs() })
+        }
         return l
     }
 }
@@ -378,4 +389,61 @@ class DenoiseProcessor(private val level: Float) : BaseAudioProcessor() {
         // any odd trailing bytes are dropped
         while (inp.hasRemaining()) inp.get()
     }
+}
+
+
+// ---- Live variants (preview only): re-read the clip's values on every frame so sliders act while being dragged.
+
+class LiveAnimTransform(private val c: Clip, private val localMs: (Long) -> Long) : MatrixTransformation {
+    private var aspect = 1f
+    override fun configure(inputWidth: Int, inputHeight: Int): Size {
+        aspect = inputWidth.toFloat() / max(1, inputHeight)
+        return Size(inputWidth, inputHeight)
+    }
+    override fun getMatrix(presentationTimeUs: Long): Matrix {
+        val p = Anim.pose(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, localMs(presentationTimeUs), c.lengthMs)
+        val m = Matrix()
+        m.setScale(aspect, 1f)
+        m.postRotate(-p.rot)
+        m.postScale(1f / aspect, 1f)
+        m.postScale(p.sx, p.sy)
+        m.postTranslate(p.x, p.y)
+        return m
+    }
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = false
+}
+
+class LiveAnimGain(private val c: Clip, private val localMs: (Long) -> Long) : RgbMatrix {
+    override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray {
+        val g = Anim.pose(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, localMs(presentationTimeUs), c.lengthMs).gain
+        return floatArrayOf(g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, 1f)
+    }
+}
+
+class LiveFadeMatrix(private val c: Clip, private val localMs: (Long) -> Long) : RgbMatrix {
+    override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray {
+        val g = Fade.gain(localMs(presentationTimeUs), c.lengthMs, c.fadeInMs, c.fadeOutMs)
+        return floatArrayOf(g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, g, 0f, 0f, 0f, 0f, 1f)
+    }
+}
+
+class LiveKeyframeTransform(private val c: Clip, private val localMs: (Long) -> Long) : MatrixTransformation {
+    private var aspect = 1f
+    override fun configure(inputWidth: Int, inputHeight: Int): Size {
+        aspect = inputWidth.toFloat() / max(1, inputHeight)
+        return Size(inputWidth, inputHeight)
+    }
+    override fun getMatrix(presentationTimeUs: Long): Matrix {
+        val m = Matrix()
+        val frames = c.keyframes.toList().sortedBy { it.tMs }
+        if (frames.isEmpty()) return m
+        val k = Keyframes.valueAt(frames, localMs(presentationTimeUs))
+        m.setScale(aspect, 1f)
+        m.postRotate(-k.rot)
+        m.postScale(1f / aspect, 1f)
+        m.postScale(k.scale, k.scale)
+        m.postTranslate(k.x, k.y)
+        return m
+    }
+    override fun isNoOp(inputWidth: Int, inputHeight: Int): Boolean = false
 }
