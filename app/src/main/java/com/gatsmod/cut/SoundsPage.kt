@@ -98,7 +98,7 @@ class SoundsPage(
     private var adding = false
     private var gen = 0
 
-    private val categories = listOf("Trending", "Phonk", "Lofi", "Vlog", "Funny", "Cinematic", "Hip hop", "Chill", "Happy", "Sad", "Gaming", "Piano", "Beat", "Nature")
+    private val categories = SoundsData.CATS
     private var cat = 0
 
     private fun dp(v: Int) = (v * act.resources.displayMetrics.density).toInt()
@@ -366,11 +366,8 @@ class SoundsPage(
         thumbCache.get(u)?.let { iv.setImageBitmap(it); return }
         iv.tag = u
         pool.execute {
-            try {
-                val c = open(u)
-                val bmp = c.inputStream.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = 2 }) }
-                if (bmp != null) { thumbCache.put(u, bmp); ui.post { if (iv.tag == u) iv.setImageBitmap(bmp) } }
-            } catch (_: Exception) {}
+            val bmp = SoundsData.cover(act, u)
+            if (bmp != null) { thumbCache.put(u, bmp); ui.post { if (iv.tag == u) iv.setImageBitmap(bmp) } }
         }
     }
 
@@ -415,21 +412,11 @@ class SoundsPage(
 
     private fun toast(s: String) = ui.post { Toast.makeText(act, s, Toast.LENGTH_SHORT).show() }
 
-    private fun open(url: String): HttpURLConnection {
-        var u = url
-        for (i in 0 until 6) {
-            val c = URL(u).openConnection() as HttpURLConnection
-            c.connectTimeout = 12000; c.readTimeout = 20000; c.instanceFollowRedirects = false
-            c.setRequestProperty("User-Agent", "GetCut/1.0 (Android video editor)")
-            val code = c.responseCode
-            if (code in 300..399) { u = URL(URL(u), c.getHeaderField("Location") ?: break).toString(); c.disconnect(); continue }
-            if (code != 200) { c.disconnect(); throw java.io.IOException("HTTP $code") }
-            return c
-        }
-        throw java.io.IOException("Too many redirects")
-    }
+    private fun open(url: String): HttpURLConnection = SoundsData.open(url)
 
-    private fun JSONObject.str(k: String) = if (isNull(k)) "" else optString(k)
+    private fun jamendoId() = SoundsData.jamendoId(act)
+
+    private var searchGen = 0
 
     private fun search(reset: Boolean) {
         if (reset) { page = 1; results.clear(); hasMore = false; selected = null; stopPlayer() }
@@ -437,75 +424,26 @@ class SoundsPage(
         loading = true; error = null
         render()
         val jid = jamendoId()
-        if (jid.isNotBlank()) { searchJamendo(jid); return }
-        val q = if (query.isBlank()) "instrumental" else query
-        val url = "https://api.openverse.org/v1/audio/?q=" + URLEncoder.encode(q, "UTF-8") +
-            "&category=music&page_size=20&page=$page" + (if (commercial) "&license_type=commercial" else "")
+        val url = SoundsData.url(jid, query, if (cat < 0) 0 else cat, commercial, page)
         val my = ++searchGen
         pool.execute {
             try {
-                val text = open(url).inputStream.bufferedReader().use { it.readText() }
-                val arr = JSONObject(text).optJSONArray("results") ?: JSONArray()
-                val list = mutableListOf<Track>()
-                for (i in 0 until arr.length()) {
-                    val r = arr.getJSONObject(i)
-                    val u = r.str("url")
-                    if (!u.startsWith("http")) continue
-                    val ft = r.str("filetype").lowercase()
-                    val ext = Regex("\\.(mp3|ogg|oga|opus|wav|m4a|aac|flac)(\\?|$)", RegexOption.IGNORE_CASE).find(u)?.groupValues?.get(1)?.lowercase()
-                        ?: (if (ft == "mpeg" || ft.isBlank()) "mp3" else ft)
-                    list.add(Track(r.str("id").ifBlank { u.hashCode().toString() }, r.str("title"), r.str("creator"), u, r.str("thumbnail").takeIf { it.startsWith("http") },
-                        r.optLong("duration", 0L), r.str("license"), r.str("license_version"), r.str("foreign_landing_url"), ext))
-                }
-                val count = arr.length()
-                ui.post { if (my == searchGen) { results.addAll(list); hasMore = count >= 20; loading = false; render() } }
-            } catch (e: Exception) {
-                val busy = e.message?.contains("429") == true
-                ui.post { if (my == searchGen) { loading = false; error = if (busy) "The free music server is busy right now. Wait a minute and try again." else "Could not load music. Check your internet connection."; render() } }
-            }
-        }
-    }
-
-    private var searchGen = 0
-
-    private fun jamendoId() = prefs.getString("jamendo_id", "")?.trim() ?: ""
-
-    /** Jamendo: a big catalogue of free (Creative Commons) music with real "trending" charts. Needs a free client ID. */
-    private fun searchJamendo(id: String) {
-        val my = ++searchGen
-        val sb = StringBuilder("https://api.jamendo.com/v3.0/tracks/?client_id=").append(URLEncoder.encode(id, "UTF-8"))
-            .append("&format=json&limit=20&offset=").append((page - 1) * 20).append("&imagesize=200&audioformat=mp32&include=licenses")
-        val isCat = cat > 0 && query.isNotBlank()
-        when {
-            query.isBlank() -> sb.append("&order=popularity_week")
-            isCat -> sb.append("&order=popularity_month&fuzzytags=").append(URLEncoder.encode(query.lowercase().replace(" ", "+"), "UTF-8"))
-            else -> sb.append("&order=relevance&search=").append(URLEncoder.encode(query, "UTF-8"))
-        }
-        pool.execute {
-            try {
-                val text = open(sb.toString()).inputStream.bufferedReader().use { it.readText() }
-                val o = JSONObject(text)
-                val hdr = o.optJSONObject("headers")
-                if (hdr != null && hdr.optString("status") == "failed") throw java.io.IOException("jamendo: " + hdr.optString("error_message"))
-                val arr = o.optJSONArray("results") ?: JSONArray()
-                val list = mutableListOf<Track>()
-                for (i in 0 until arr.length()) {
-                    val r = arr.getJSONObject(i)
-                    val u = r.str("audio").ifBlank { r.str("audiodownload") }
-                    if (!u.startsWith("http")) continue
-                    val cc = r.str("license_ccurl")
-                    val seg = cc.substringAfter("/licenses/", "").trim('/').split("/")
-                    val lic = seg.getOrNull(0) ?: ""; val ver = seg.getOrNull(1) ?: ""
-                    val t = Track(r.str("id"), r.str("name"), r.str("artist_name"), u, r.str("image").takeIf { it.startsWith("http") },
-                        r.optLong("duration", 0L) * 1000L, lic, ver, r.str("shareurl"), "mp3")
-                    if (commercial && !t.commercialOk) continue
-                    list.add(t)
-                }
-                val count = arr.length()
+                val text = SoundsData.cachedText(act, url)
+                val (list, count) = SoundsData.parse(text, jid.isNotBlank(), commercial)
                 ui.post { if (my == searchGen) { results.addAll(list); hasMore = count >= 20; loading = false; render() } }
             } catch (e: Exception) {
                 val m = e.message ?: ""
-                ui.post { if (my == searchGen) { loading = false; error = if (m.startsWith("jamendo")) "Jamendo said: " + m.removePrefix("jamendo: ") + "\nCheck your Client ID (More music)." else "Could not load music. Check your internet connection."; render() } }
+                ui.post {
+                    if (my == searchGen) {
+                        loading = false
+                        error = when {
+                            m.startsWith("jamendo") -> "Jamendo said: " + m.removePrefix("jamendo: ") + "\nCheck your Client ID (More music)."
+                            m.contains("429") -> "The free music server is busy right now. Wait a minute and try again."
+                            else -> "Could not load music. Check your internet connection."
+                        }
+                        render()
+                    }
+                }
             }
         }
     }
