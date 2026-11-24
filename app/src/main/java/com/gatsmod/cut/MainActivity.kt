@@ -691,7 +691,7 @@ class MainActivity : AppCompatActivity() {
         val del = T(R.drawable.ic_delete, "Delete") { engine.pause(); result(project.delete()) }
         val trimS = T(R.drawable.ic_trim, "Trim start") { doTrim(true) }
         val trimE = T(R.drawable.ic_trim, "Trim end") { doTrim(false) }
-        if (c.kind == LaneKind.VIDEO && c.label == EndingCard.LABEL) return listOf(T(R.drawable.ic_text, "Edit text") { editEnding(c) }, del)
+        if (c.kind == LaneKind.VIDEO && isEnding(c)) return listOf(T(R.drawable.ic_text, "Edit text") { editEnding(c) }, del)
         return when (c.kind) {
             LaneKind.VIDEO -> listOf(
                 split,
@@ -963,8 +963,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isEnding(c: Clip) = c.label == EndingCard.LABEL || c.uri.contains("/endings/")
+
     private fun removeBgDialog() {
         val c = need(true) ?: return
+        if (isEnding(c)) { toast("The ending card has no person in it - Remove BG is only for your own video"); return }
         val srcLen = c.srcOutMs - c.srcInMs
         val names = listOf("Blur", "Black", "White", "Green", "Blue", "Grey", "My photo")
         val cols = intArrayOf(0, 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF00B140.toInt(), 0xFF1E5BFF.toInt(), 0xFF808080.toInt(), 0xFF000000.toInt())
@@ -976,7 +979,7 @@ class MainActivity : AppCompatActivity() {
             if (it == 6) { bgPhotoCb = { u -> photoUri = u; toast("Photo chosen") }; bgPicker.launch(arrayOf("image/*")) }
         }
         val go = button("Remove background") {
-            if (srcLen > 20000) { toast("Remove BG works on clips up to 20 s — cut the clip shorter first"); return@button }
+            if (srcLen > 60000) { toast("Remove BG works on clips up to 60 s — cut the clip shorter first"); return@button }
             dlg?.dismiss()
             val id = c.id
             val uri = c.uri; val inMs = c.srcInMs; val outMs = c.srcOutMs
@@ -992,9 +995,9 @@ class MainActivity : AppCompatActivity() {
                 val n = max(1, (srcLen * fps / 1000L).toInt())
                 val out = File(File(filesDir, "reversed"), "B_" + System.currentTimeMillis() + ".mp4")
                 var last: Bitmap? = null
-                val res = FrameVideo.write(out, fps, n, 6_000_000, { i ->
+                val res = FrameVideo.write(out, fps, n, 10_000_000, { i ->
                     val t = (inMs + (i + 0.5f) * 1000f / fps).toLong().coerceIn(inMs, outMs - 1)
-                    val f = FrameVideo.frameAt(r, t, 960) ?: return@write last
+                    val f = FrameVideo.frameAt(r, t, 1280) ?: return@write last
                     val o = seg.process(f)
                     f.recycle()
                     if (o != null) last = o
@@ -1033,7 +1036,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         dlg = sheet("Remove BG", label("New background"), chipRow, go,
-            label("Finds the person in every frame and replaces everything behind them with a blur, a plain colour or a photo from your gallery. (A see-through cut-out is not possible: the video format has no transparency.) Works best on one person filmed from the chest up (like a selfie) with a clearly different background. It is a simple on-device model: hair and hands can have rough edges, and it will not cut out objects or animals. Works on clips up to 20 s and takes a while. A new video is made, so you can Undo."))
+            label("Finds the person in every frame and replaces everything behind them with a blur, a plain colour or a photo from your gallery. (A see-through cut-out is not possible: the video format has no transparency.) Works best on one person filmed from the chest up (like a selfie) with a clearly different background. It is a simple on-device model: hair and hands can have rough edges, and it will not cut out objects or animals. It looks at the whole person, then again from close up, then at the head alone for hair. Works on clips up to 60 s and takes a while (about 1 min of waiting per 10 s of video). A new video is made, so you can Undo."))
     }
 
     // ---------------------------------------------------------------- ending card, watermark, cover

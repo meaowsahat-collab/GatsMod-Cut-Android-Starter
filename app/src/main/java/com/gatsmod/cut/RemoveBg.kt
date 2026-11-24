@@ -63,7 +63,42 @@ class RemoveBg(private val blurBackground: Boolean, private val color: Int, priv
             out[y * fw + x] = if (inCrop) MaskMath.sample(m2!!, m2w, m2h, (px - cx0).toInt(), (py - cy0).toInt(), cw, ch)
             else MaskMath.sample(m1, mw, mh, (px).toInt().coerceIn(0, w - 1), (py).toInt().coerceIn(0, h - 1), w, h)
         }
+        if (x1 >= x0 && y1 >= y0) headPass(src, m1, mw, mh, x0, y0, x1, y1, out, fw, fh)
         return Triple(out, fw, fh)
+    }
+
+    /** Third look: only the head, from very close, so hair gets far more detail than in the whole-person pass. */
+    private fun headPass(src: Bitmap, m1: FloatArray, mw: Int, mh: Int, x0: Int, y0: Int, x1: Int, y1: Int, out: FloatArray, fw: Int, fh: Int) {
+        try {
+            val w = src.width; val h = src.height
+            val hy1 = (y0 + (y1 - y0 + 1) * 0.38f).toInt().coerceIn(y0 + 1, y1)
+            var hx0 = mw; var hx1 = -1
+            for (y in y0..hy1) for (x in 0 until mw) if (m1[y * mw + x] > 0.5f) { if (x < hx0) hx0 = x; if (x > hx1) hx1 = x }
+            if (hx1 < hx0) return
+            val mx = ((hx1 - hx0 + 1) * 0.3f).toInt() + 2; val my = ((hy1 - y0 + 1) * 0.3f).toInt() + 2
+            val cx0 = (maxOf(0, hx0 - mx).toFloat() * w / mw).toInt()
+            val cy0 = (maxOf(0, y0 - my).toFloat() * h / mh).toInt()
+            val cw = ((minOf(mw, hx1 + mx + 1).toFloat() * w / mw).toInt() - cx0).coerceIn(1, w - cx0)
+            val ch = ((minOf(mh, hy1 + my + 1).toFloat() * h / mh).toInt() - cy0).coerceIn(1, h - cy0)
+            if (cw < 64 || ch < 64 || cw.toLong() * ch > 0.5 * w * h) return
+            val crop = Bitmap.createBitmap(src, cx0, cy0, cw, ch)
+            val mk = Tasks.await(segmenter.process(InputImage.fromBitmap(crop, 0)), 10, TimeUnit.SECONDS)
+            crop.recycle()
+            val b = mk.buffer; b.rewind()
+            val m3 = FloatArray(mk.width * mk.height) { b.float }
+            for (y in 0 until fh) for (x in 0 until fw) {
+                val px = (x + 0.5f) * w / fw; val py = (y + 0.5f) * h / fh
+                if (px < cx0 || px >= cx0 + cw || py < cy0 || py >= cy0 + ch) continue
+                val u = (px - cx0) / cw; val v = (py - cy0) / ch
+                // trust the close-up fully at the top, fade it out towards the cut edges of the crop
+                val wy = if (v < 0.7f) 1f else ((1f - v) / 0.3f).coerceIn(0f, 1f)
+                val wx = minOf(u, 1f - u).let { (it / 0.12f).coerceIn(0f, 1f) }
+                val k = wy * wx
+                if (k <= 0f) continue
+                val v3 = MaskMath.sample(m3, mk.width, mk.height, (px - cx0).toInt(), (py - cy0).toInt(), cw, ch)
+                out[y * fw + x] = out[y * fw + x] * (1f - k) + v3 * k
+            }
+        } catch (_: Throwable) {}
     }
 
     private fun composite(src: Bitmap, m: FloatArray, mw: Int, mh: Int): Bitmap {
