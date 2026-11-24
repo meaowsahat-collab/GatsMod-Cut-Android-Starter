@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
         }
         timeline.onEdited = { afterEdit() }
         timeline.onAdd = { k -> when (k) { LaneKind.AUDIO -> audioPicker.launch(arrayOf("audio/*")); LaneKind.OVERLAY -> imagePicker.launch(arrayOf("image/*")); else -> textDialog() } }
-        timeline.onSpecial = { name -> soon(name) }
+        timeline.onSpecial = { name -> if (name == "Cover") coverDialog() else soon(name) }
 
         findViewById<View>(R.id.emptyPreview).setOnClickListener { pickVideo() }
         findViewById<View>(R.id.addClipButton).setOnClickListener { pickVideo() }
@@ -292,7 +292,7 @@ class MainActivity : AppCompatActivity() {
                 r.setDataSource(app, Uri.parse(coverUri))
                 val full = r.getFrameAtTime(coverMs * 1000L, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                 r.release()
-                if (full != null) {
+                if (full != null && !app.getSharedPreferences("covers", android.content.Context.MODE_PRIVATE).getBoolean(id, false)) {
                     val w = 240
                     val h = (w * full.height.toFloat() / full.width).toInt().coerceAtLeast(1)
                     val sm = android.graphics.Bitmap.createScaledBitmap(full, w, h, true)
@@ -397,9 +397,12 @@ class MainActivity : AppCompatActivity() {
                     width = info.displayW, height = info.displayH, hasAudio = info.hasAudio, fps = info.fps
                 )
                 project.addMain(c)
+                val e = project.main.firstOrNull { it.label == EndingCard.LABEL }
+                if (e != null && project.main.last() !== e) { project.main.remove(e); project.main.add(e); project.relayout() }
                 engine.refresh()
                 if (first) engine.seekTo(0)
                 syncUi()
+                if (first && Branding.endingOn(this)) ui.postDelayed({ addEnding() }, 300)
             }
         }.start()
     }
@@ -645,7 +648,8 @@ class MainActivity : AppCompatActivity() {
         T(R.drawable.ic_animation, "Animations") { animationDialog() },
         T(R.drawable.ic_autocap, "Auto captions") { autoCaptionsDialog() },
         T(R.drawable.ic_mic, "Voiceover") { startVoiceover() },
-        T(R.drawable.ic_star, "Templates") { templatesDialog() }
+        T(R.drawable.ic_star, "Templates") { templatesDialog() },
+        T(R.drawable.ic_captions, "Ending") { addEnding() }
     )
 
     private fun clipTools(c: Clip): List<T> {
@@ -654,6 +658,7 @@ class MainActivity : AppCompatActivity() {
         val del = T(R.drawable.ic_delete, "Delete") { engine.pause(); result(project.delete()) }
         val trimS = T(R.drawable.ic_trim, "Trim start") { doTrim(true) }
         val trimE = T(R.drawable.ic_trim, "Trim end") { doTrim(false) }
+        if (c.kind == LaneKind.VIDEO && c.label == EndingCard.LABEL) return listOf(T(R.drawable.ic_text, "Edit text") { editEnding(c) }, del)
         return when (c.kind) {
             LaneKind.VIDEO -> listOf(
                 split,
@@ -996,6 +1001,147 @@ class MainActivity : AppCompatActivity() {
         }
         dlg = sheet("Remove BG", label("New background"), chipRow, go,
             label("Finds the person in every frame and replaces everything behind them with a blur, a plain colour or a photo from your gallery. (A see-through cut-out is not possible: the video format has no transparency.) Works best on one person filmed from the chest up (like a selfie) with a clearly different background. It is a simple on-device model: hair and hands can have rough edges, and it will not cut out objects or animals. Works on clips up to 20 s and takes a while. A new video is made, so you can Undo."))
+    }
+
+    // ---------------------------------------------------------------- ending card, watermark, cover
+
+    private fun endingAspect(): Float { val sz = exporter.outputSize(project, 720); return sz.width / sz.height.toFloat() }
+
+    private fun addEnding() {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        if (project.main.any { it.label == EndingCard.LABEL }) { toast("The video already has an ending - tap it to change the text"); return }
+        val text = Branding.endingText(this)
+        val aspect = endingAspect()
+        runWork("Making ending") { progress ->
+            val res = EndingCard.make(this, text, aspect, progress) ?: return@runWork null
+            return@runWork {
+                val c = Clip(
+                    id = project.newId(), kind = LaneKind.VIDEO, uri = Uri.fromFile(res.file).toString(),
+                    srcInMs = 0, srcOutMs = res.durationMs, srcTotalMs = res.durationMs, label = EndingCard.LABEL,
+                    width = res.width, height = res.height, hasAudio = false, fps = 30
+                )
+                project.addMain(c)
+                engine.refresh()
+                syncUi()
+            }
+        }
+    }
+
+    private fun editEnding(c: Clip) {
+        val et = android.widget.EditText(this)
+        et.setText(Branding.endingText(this))
+        et.setTextColor(Color.WHITE)
+        et.setHintTextColor(0xFF888888.toInt())
+        et.hint = "Your channel name"
+        var dlg: Dialog? = null
+        dlg = sheet("Ending text", et, button("Apply") {
+            val t = et.text.toString().trim()
+            if (t.isEmpty()) { toast("Type some text first"); return@button }
+            Branding.setEndingText(this, t)
+            dlg?.dismiss()
+            val id = c.id
+            val aspect = endingAspect()
+            runWork("Making ending") { progress ->
+                val res = EndingCard.make(this, t, aspect, progress) ?: return@runWork null
+                return@runWork {
+                    val cur = project.byId(id)
+                    if (cur != null) {
+                        project.checkpoint()
+                        cur.uri = Uri.fromFile(res.file).toString()
+                        cur.srcInMs = 0; cur.srcOutMs = res.durationMs; cur.srcTotalMs = res.durationMs
+                        project.relayout()
+                        engine.pause()
+                        afterEdit()
+                    }
+                }
+            }
+        }, label("The ending card shows the Get Cut logo with this text. You can delete it any time."))
+    }
+
+    private fun watermarkDialog(after: () -> Unit) {
+        val et = android.widget.EditText(this)
+        et.setText(Branding.wmText(this))
+        et.setTextColor(Color.WHITE)
+        et.hint = "Watermark text"
+        et.setHintTextColor(0xFF888888.toInt())
+        et.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { Branding.setWm(this@MainActivity, text = s?.toString() ?: "") }
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+        })
+        sheet("Watermark",
+            label("Type"),
+            chips(listOf("None", "Text", "Image"), Branding.wmMode(this)) { Branding.setWm(this, mode = it) },
+            label("Text (used when Type is Text)"), et,
+            button("Choose image (used when Type is Image)") {
+                bgPhotoCb = { u ->
+                    try {
+                        val bmp = contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it) }
+                        if (bmp != null) {
+                            val f = File(filesDir, "watermark.png")
+                            f.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                            Branding.setWm(this, mode = 2, image = f.absolutePath)
+                            toast("Image chosen")
+                        } else toast("Could not read this image")
+                    } catch (_: Throwable) { toast("Could not read this image") }
+                }
+                bgPicker.launch(arrayOf("image/*"))
+            },
+            label("Position"),
+            chips(listOf("Top left", "Top right", "Bottom left", "Bottom right"), Branding.wmPos(this)) { Branding.setWm(this, pos = it) },
+            slider("Opacity", 10f, 100f, Branding.wmAlpha(this).toFloat(), { "${it.toInt()}%" }) { Branding.setWm(this, alpha = it.toInt()) },
+            label("The watermark is added in the exported video, in a corner for the whole length. It is not shown in the editor preview."),
+            onClose = after)
+    }
+
+    private fun saveToGallery(bmp: Bitmap, name: String): Boolean = try {
+        val cv = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Get Cut")
+        }
+        val u = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
+        u?.let { contentResolver.openOutputStream(it)?.use { o -> bmp.compress(Bitmap.CompressFormat.PNG, 100, o) } }
+        u != null
+    } catch (_: Throwable) { false }
+
+    private fun setCover(bmp: Bitmap) {
+        val w = 480
+        val h = (w * bmp.height.toFloat() / bmp.width).toInt().coerceAtLeast(1)
+        val sm = Bitmap.createScaledBitmap(bmp, w, h, true)
+        try { ProjectStore.thumb(this, projectId).outputStream().use { sm.compress(Bitmap.CompressFormat.JPEG, 90, it) } } catch (_: Exception) {}
+        getSharedPreferences("covers", MODE_PRIVATE).edit().putBoolean(projectId, true).apply()
+        timeline.coverBmp = sm
+        timeline.invalidate()
+        val ok = saveToGallery(bmp, "GetCut_cover_" + System.currentTimeMillis())
+        toast(if (ok) "Cover set and saved to Pictures/Get Cut" else "Cover set")
+    }
+
+    private fun coverDialog() {
+        if (project.isEmpty()) { toast("Import a video first"); return }
+        var dlg: Dialog? = null
+        dlg = sheet("Cover",
+            button("Use the frame at the playhead") {
+                val ph = engine.playheadMs
+                val c = project.main.firstOrNull { ph >= it.startMs && ph < it.endMs } ?: project.main.first()
+                dlg?.dismiss()
+                val ms = c.srcInMs + ((ph - c.startMs).coerceAtLeast(0L) * c.speed).toLong()
+                Thread {
+                    val r = FrameVideo.openRetriever(this, c.uri)
+                    val f = if (r != null) FrameVideo.frameAt(r, ms, 1280) else null
+                    try { r?.release() } catch (_: Exception) {}
+                    runOnUiThread { if (f != null) setCover(f) else toast("Could not read that frame") }
+                }.start()
+            },
+            button("Choose a picture from the gallery") {
+                dlg?.dismiss()
+                bgPhotoCb = { u ->
+                    val b = try { contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it) } } catch (_: Throwable) { null }
+                    if (b != null) setCover(b) else toast("Could not read this image")
+                }
+                bgPicker.launch(arrayOf("image/*"))
+            },
+            label("The cover is the picture shown for this project on the home page. It is also saved to your gallery."))
     }
 
     private fun freezeFrame() {
@@ -1417,6 +1563,16 @@ class MainActivity : AppCompatActivity() {
         reset.setOnClickListener { bitrateMbps = 0f; brBar.progress = (recommended() - 5f).toInt().coerceIn(0, 95); upd() }
         root.addView(reset)
 
+        val wmRow = LinearLayout(this)
+        wmRow.gravity = Gravity.CENTER_VERTICAL
+        val wmT = TextView(this); wmT.text = "Watermark"; wmT.setTextColor(Color.WHITE); wmT.textSize = 18f
+        wmRow.addView(wmT, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val wmV = TextView(this); wmV.setTextColor(0xFF9A9AA2.toInt()); wmV.textSize = 15f
+        fun wmUpd() { wmV.text = (when (Branding.wmMode(this)) { 1 -> "Text"; 2 -> "Image"; else -> "None" }) + "  ›" }
+        wmUpd()
+        wmRow.addView(wmV)
+        wmRow.setOnClickListener { watermarkDialog { wmUpd() } }
+        root.addView(wmRow, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dp(28) })
         root.addView(View(this), LinearLayout.LayoutParams(-1, 0, 1f))
         val line = View(this); line.setBackgroundColor(0x33FFFFFF)
         root.addView(line, LinearLayout.LayoutParams(-1, 1))

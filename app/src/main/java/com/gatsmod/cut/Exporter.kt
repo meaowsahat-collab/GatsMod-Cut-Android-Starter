@@ -217,6 +217,7 @@ class Exporter(private val ctx: Context) {
             if (o.startMs >= totalMs) continue
             overlays.add(TimedOverlay(ctx, o.deepCopy(), o.startMs * 1000L, min(o.endMs, totalMs) * 1000L))
         }
+        Branding.watermarkBitmap(ctx, outputSize(p, s.shortSide).width)?.let { overlays.add(WatermarkOverlay(it, Branding.wmPos(ctx), Branding.wmAlpha(ctx))) }
         if (overlays.isNotEmpty()) whole.add(OverlayEffect(overlays))
 
         val mixedAudio = p.main.any { it.hasAudio } && p.main.any { !it.hasAudio }

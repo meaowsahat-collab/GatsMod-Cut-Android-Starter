@@ -327,6 +327,6 @@ class HomeActivity : AppCompatActivity() {
 
     private fun aboutDialog() {
         val v = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "" }
-        lightSheet("Get Cut  v$v", row("Check for updates") { updater.check(false) }, EditorTheme.picker(this) {})
+        lightSheet("Get Cut  v$v", row("Check for updates") { updater.check(false) }, row("Ending card on new videos: " + (if (Branding.endingOn(this)) "ON" else "OFF") + "  (tap to change)") { Branding.setEndingOn(this, !Branding.endingOn(this)); toast("Ending card is now " + (if (Branding.endingOn(this)) "ON" else "OFF")) }, EditorTheme.picker(this) {})
     }
 }
