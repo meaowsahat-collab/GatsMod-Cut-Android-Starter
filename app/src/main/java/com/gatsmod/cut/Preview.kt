@@ -24,6 +24,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     }
 
     private var effectsOk = true
+    private var failedId: Any? = null
     private var appliedFx = "\u0000"
 
     var listener: Listener? = null
@@ -64,8 +65,10 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             // Never leave the preview dead: report it, drop the preview effects and restart playback.
-            listener?.onProblem("Preview problem: ${error.errorCodeName} ${error.cause?.message ?: error.message ?: ""}".trim())
+            val why = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.distinct().joinToString(" / ").take(160)
+            listener?.onProblem("Preview problem: ${error.errorCodeName} $why".trim())
             if (effectsOk) {
+                failedId = project.mainClipAt(playheadMs)?.id
                 effectsOk = false
                 appliedFx = "off"
                 rebuild(emptyList())
@@ -84,7 +87,6 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     }
 
     init {
-        player.setVideoEffects(emptyList())
         player.addListener(playerListener)
     }
 
@@ -187,13 +189,13 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val play = player.playWhenReady
         val old = player
         val fresh = buildPlayer(c.denoise)
-        try {
+        // no effects -> do not touch the GL frame pipeline at all (plain, most compatible playback path)
+        if (effects.isNotEmpty()) try {
             fresh.setVideoEffects(effects)
         } catch (e: Exception) {
             listener?.onProblem("Effect not supported: ${e.message}")
             effectsOk = false
             appliedFx = "off"
-            fresh.setVideoEffects(emptyList())
         }
         fresh.addListener(playerListener)
         fresh.setMediaItems(items, idx, pos)
@@ -210,6 +212,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     /** Applies speed, volume and effects of the clip under the playhead. */
     private fun applyLook(force: Boolean) {
         val c = project.mainClipAt(playheadMs) ?: return
+        if (!effectsOk && c.id != failedId) { effectsOk = true; appliedFx = "\u0000" }
         val key = "${c.id}|${c.paramSig()}"
         if (!force && key == appliedKey) return
         appliedKey = key
