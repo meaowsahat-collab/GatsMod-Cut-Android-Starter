@@ -26,6 +26,8 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
     private var effectsOk = true
     private var failedId: Any? = null
     private var liveId: Any? = null
+    private var safeMode = false
+    private fun isCustomGl(e: androidx.media3.common.Effect) = e is ToneGlEffect || e is LookGlEffect || e is LiveColorEffect
     private var appliedFx = "\u0000"
 
     var listener: Listener? = null
@@ -80,8 +82,17 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
                 handler.postDelayed({ rebuild(lastEffects) }, 400L * decoderRetries)
                 return
             }
+            val names = lastEffects.joinToString(", ") { it.javaClass.simpleName }
+            if (!safeMode && lastEffects.any { isCustomGl(it) }) {
+                // a custom shader failed on this phone: keep the standard effects (brightness, contrast, filters ...) instead of dropping everything
+                safeMode = true
+                val whyShader = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.distinct().joinToString(" / ").take(300)
+                listener?.onProblem("Custom shader failed (${error.errorCodeName}): $whyShader | effects: $names")
+                rebuild(lastEffects.filter { !isCustomGl(it) })
+                return
+            }
             val why = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.distinct().joinToString(" / ").take(160)
-            listener?.onProblem("Preview problem: ${error.errorCodeName} $why".trim())
+            listener?.onProblem("Preview problem: ${error.errorCodeName} $why | effects: $names".trim())
             if (effectsOk) {
                 failedId = project.mainClipAt(playheadMs)?.id
                 effectsOk = false
@@ -254,7 +265,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
             val hadAny = appliedFx != "\u0000"
             appliedFx = fxKey
             val fx = if (effectsOk) {
-                try { Fx.previewEffects(c, live) { playheadMs - c.startMs } } catch (e: Exception) { effectsOk = false; emptyList() }
+                try { Fx.previewEffects(c, live) { playheadMs - c.startMs }.let { l -> if (safeMode) l.filter { !isCustomGl(it) } else l } } catch (e: Exception) { effectsOk = false; emptyList() }
             } else emptyList()
             // empty -> empty needs no rebuild
             if (hadAny || fx.isNotEmpty() || c.denoise > 0f) rebuild(fx)

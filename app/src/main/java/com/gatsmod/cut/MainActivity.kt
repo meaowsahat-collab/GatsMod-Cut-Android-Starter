@@ -157,7 +157,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onProblem(message: String) {
-                runOnUiThread { Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show() }
+                runOnUiThread {
+                    if (message.length > 90) android.app.AlertDialog.Builder(this@MainActivity).setTitle("Preview problem").setMessage(message).setPositiveButton("OK", null).show()
+                    else Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
             }
         }
 
