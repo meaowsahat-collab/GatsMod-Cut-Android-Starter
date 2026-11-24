@@ -173,7 +173,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
 
     private fun barRect(row: Row) = RectF(xOf(0), row.top, max(xOf(total()), xOf(0) + dp(190f)), row.top + row.h)
     private fun iconBox(row: Row) = RectF(xOf(0) - dp(46f), row.top, xOf(0) - dp(10f), row.top + row.h)
-    var coverBmp: Bitmap? = null
+    var coverBmp: android.graphics.Bitmap? = null
 
     private fun coverBox(row: Row) = RectF(xOf(0) - dp(66f), row.top, xOf(0) - dp(8f), row.top + row.h)
     private fun aiBox(row: Row) = RectF(xOf(0) - dp(130f), row.top, xOf(0) - dp(72f), row.top + row.h)

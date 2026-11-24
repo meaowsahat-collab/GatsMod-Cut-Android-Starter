@@ -1018,7 +1018,7 @@ class MainActivity : AppCompatActivity() {
                 val c = Clip(
                     id = project.newId(), kind = LaneKind.VIDEO, uri = Uri.fromFile(res.file).toString(),
                     srcInMs = 0, srcOutMs = res.durationMs, srcTotalMs = res.durationMs, label = EndingCard.LABEL,
-                    width = res.width, height = res.height, hasAudio = false, fps = 30
+                    width = res.width, height = res.height, hasAudio = false, fps = 30f
                 )
                 project.addMain(c)
                 engine.refresh()
