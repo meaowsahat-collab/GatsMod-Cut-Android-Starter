@@ -107,6 +107,76 @@ object SoundsData {
         return list to arr.length()
     }
 
+    private fun dropCache(ctx: Context, url: String) { try { File(dir(ctx), md5(url) + ".json").delete() } catch (_: Exception) {} }
+
+    private fun commonsUrl(q: String, page: Int) = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=20" +
+        "&gsroffset=" + ((page - 1) * 20) + "&gsrsearch=" + URLEncoder.encode("$q filetype:audio", "UTF-8") +
+        "&prop=imageinfo&iiprop=url%7Cmime&iiextmetadatafilter=LicenseShortName%7CArtist&iiextmetadatalanguage=en"
+
+    /** Wikimedia Commons audio files (Creative Commons / public domain). */
+    private fun parseCommons(text: String): Pair<List<SoundsPage.Track>, Int> {
+        val pages = JSONObject(text).optJSONObject("query")?.optJSONObject("pages") ?: return emptyList<SoundsPage.Track>() to 0
+        val list = mutableListOf<SoundsPage.Track>()
+        val keys = pages.keys().asSequence().toList()
+        for (k in keys) {
+            val p = pages.getJSONObject(k)
+            val ii = p.optJSONArray("imageinfo")?.optJSONObject(0) ?: continue
+            val u = ii.str("url")
+            if (!u.startsWith("http") || !ii.str("mime").startsWith("audio")) continue
+            val meta = ii.optJSONObject("extmetadata")
+            val licName = meta?.optJSONObject("LicenseShortName")?.str("value")?.lowercase() ?: ""
+            val artist = (meta?.optJSONObject("Artist")?.str("value") ?: "").replace(Regex("<[^>]*>"), "").trim()
+            val m = Regex("cc[- ]by(-sa|-nc-sa|-nc-nd|-nc|-nd)?[- ]?([0-9.]+)?").find(licName)
+            val lic = when {
+                licName.contains("cc0") || licName.contains("cc-zero") -> "cc0"
+                licName.contains("public domain") || licName.contains("pd") -> "pdm"
+                m != null -> "by" + (m.groupValues[1])
+                else -> "by-sa"
+            }
+            val ver = m?.groupValues?.get(2) ?: ""
+            val title = p.str("title").removePrefix("File:").substringBeforeLast('.').replace('_', ' ')
+            val ext = u.substringAfterLast('.', "ogg").lowercase().take(4)
+            list.add(SoundsPage.Track("wm_" + p.optLong("pageid"), title, artist, u, null, 0L, lic, ver,
+                "https://commons.wikimedia.org/wiki/" + URLEncoder.encode(p.str("title").replace(' ', '_'), "UTF-8"), ext))
+        }
+        return list to keys.size
+    }
+
+    /** Sound effects: Openverse sound_effect category -> Openverse text search -> Wikimedia Commons. Empty answers are never kept in the cache. */
+    fun sfxSearch(ctx: Context, query: String, page: Int): Triple<List<SoundsPage.Track>, Int, String> {
+        val q = if (query.isBlank()) "click" else query
+        val enc = URLEncoder.encode(q, "UTF-8")
+        val dbg = StringBuilder()
+        fun short(l: List<SoundsPage.Track>) = l.filter { it.durMs <= 0 || it.durMs <= 30000 }
+        // 1
+        val u1 = "https://api.openverse.org/v1/audio/?q=$enc&category=sound_effect&page_size=20&page=$page"
+        try {
+            val (l, c) = parse(cachedText(ctx, u1), false, false)
+            dbg.append("openverse ").append(c).append(" / ")
+            val sl = short(l)
+            if (sl.isNotEmpty()) return Triple(sl, c, "")
+            dropCache(ctx, u1)
+        } catch (e: Exception) { dbg.append("openverse ").append(e.message).append(" / "); dropCache(ctx, u1) }
+        // 2
+        val u2 = "https://api.openverse.org/v1/audio/?q=" + URLEncoder.encode("$q sound effect", "UTF-8") + "&page_size=20&page=$page"
+        try {
+            val (l, c) = parse(cachedText(ctx, u2), false, false)
+            dbg.append("openverse2 ").append(c).append(" / ")
+            val sl = short(l).filter { it.durMs > 0 }
+            if (sl.isNotEmpty()) return Triple(sl, c, "")
+            dropCache(ctx, u2)
+        } catch (e: Exception) { dbg.append("openverse2 ").append(e.message).append(" / "); dropCache(ctx, u2) }
+        // 3
+        val u3 = commonsUrl(q, page)
+        try {
+            val (l, c) = parseCommons(cachedText(ctx, u3))
+            dbg.append("commons ").append(c)
+            if (l.isNotEmpty()) return Triple(l, c, "")
+            dropCache(ctx, u3)
+        } catch (e: Exception) { dbg.append("commons ").append(e.message); dropCache(ctx, u3) }
+        return Triple(emptyList(), 0, dbg.toString())
+    }
+
     /** Cover picture: from disk if saved, else downloaded once and saved. */
     fun cover(ctx: Context, url: String): Bitmap? {
         val f = File(File(dir(ctx), "thumbs").apply { mkdirs() }, md5(url))
@@ -150,7 +220,7 @@ object SoundsData {
                     }
                     Thread.sleep(1500)
                 }
-                try { cachedText(ctx, "https://api.openverse.org/v1/audio/?q=click&category=sound_effect&page_size=20&page=1") } catch (_: Exception) {}
+                try { sfxSearch(ctx, "click", 1) } catch (_: Exception) {}
             } catch (_: Throwable) {}
         }.apply { priority = Thread.MIN_PRIORITY; isDaemon = true; name = "getcut-preload" }.start()
     }

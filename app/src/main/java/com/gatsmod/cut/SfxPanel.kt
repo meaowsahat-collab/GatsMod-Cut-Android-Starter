@@ -168,19 +168,21 @@ class SfxPanel(private val act: Activity, private val onAdd: (uri: String, durMs
             }
         }
         loading = true; render()
-        val q = if (query.isBlank()) "click" else query
-        val url = "https://api.openverse.org/v1/audio/?q=" + java.net.URLEncoder.encode(q, "UTF-8") + "&category=sound_effect&page_size=20&page=$page"
         pool.execute {
             try {
-                val text = SoundsData.cachedText(act, url)
-                val (list, count) = SoundsData.parse(text, false, false)
-                val short = list.filter { it.durMs <= 0 || it.durMs <= 30000 }
-                ui.post { if (my == gen) { items.addAll(short); hasMore = count >= 20; loading = false; render() } }
+                val (list, count, dbg) = SoundsData.sfxSearch(act, query, page)
+                ui.post {
+                    if (my == gen) {
+                        items.addAll(list); hasMore = count >= 20; loading = false
+                        if (list.isEmpty() && items.isEmpty()) error = "No sounds found online. Try another word or open the Built-in tab.\n($dbg)"
+                        render()
+                    }
+                }
             } catch (e: Exception) {
                 ui.post {
                     if (my == gen) {
                         loading = false
-                        error = if (e.message?.contains("429") == true) "The free sound server is busy. Wait a minute and try again." else "Could not load sounds. Check your internet - or open the Built-in tab."
+                        error = "Could not load sounds. Check your internet - or open the Built-in tab."
                         render()
                     }
                 }
