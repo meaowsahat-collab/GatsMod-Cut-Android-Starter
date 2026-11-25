@@ -68,7 +68,7 @@ class SoundsPage(
             JSONObject(ctx.getSharedPreferences(PREFS, 0).getString("credits", "{}")!!).optJSONObject(uri)?.let { Track.from(it) }
         } catch (_: Exception) { null }
 
-        private fun saveCredit(ctx: android.content.Context, uri: String, t: Track) {
+        fun saveCredit(ctx: android.content.Context, uri: String, t: Track) {
             val sp = ctx.getSharedPreferences(PREFS, 0)
             val o = try { JSONObject(sp.getString("credits", "{}")!!) } catch (_: Exception) { JSONObject() }
             o.put(uri, t.toJson())

@@ -150,6 +150,7 @@ object SoundsData {
                     }
                     Thread.sleep(1500)
                 }
+                try { cachedText(ctx, "https://api.openverse.org/v1/audio/?q=click&category=sound_effect&page_size=20&page=1") } catch (_: Exception) {}
             } catch (_: Throwable) {}
         }.apply { priority = Thread.MIN_PRIORITY; isDaemon = true; name = "getcut-preload" }.start()
     }

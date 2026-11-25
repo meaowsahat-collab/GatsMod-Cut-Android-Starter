@@ -446,7 +446,7 @@ class MainActivity : AppCompatActivity() {
     private fun audioTools(): List<T> = listOf(
         T(R.drawable.ic_folder, "Extract") { if (project.isEmpty()) toast("Import a video first") else { toast("Pick a video - its sound is added to the audio track"); extractPicker.launch(arrayOf("video/*")) } },
         T(R.drawable.ic_music, "Sounds") { if (project.isEmpty()) toast("Import a video first") else SoundsPage(this, { uri, dur, label -> addAudioClip(uri, dur, label) }, { audioPicker.launch(arrayOf("audio/*")) }).show() },
-        T(R.drawable.ic_soundfx, "Sound FX") { soundLibraryDialog(false) },
+        T(R.drawable.ic_soundfx, "Sound FX") { if (project.isEmpty()) toast("Import a video first") else SfxPanel(this) { uri, dur, label -> addAudioClip(uri, dur, label) }.show() },
         T(R.drawable.ic_mic, "Record") { startVoiceover() },
         T(R.drawable.ic_tts, "Text to audio") { ttsDialog() },
         T(R.drawable.ic_brand, "Brand music") { soundLibraryDialog(true) },
