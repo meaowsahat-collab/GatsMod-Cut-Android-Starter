@@ -485,6 +485,7 @@ class HomeActivity : AppCompatActivity() {
 
     // ---------- Discover ----------
 
+    private var badge: TextView? = null
     private var player: android.media.MediaPlayer? = null
     private var playingId: String? = null
 
@@ -493,6 +494,57 @@ class HomeActivity : AppCompatActivity() {
         player = null; playingId = null
         badge?.let { it.text = it.text.toString().replace("❚❚  ", "▶  ") }
         badge = null
+    }
+
+    // ---------- Discover: ready-made templates ----------
+
+    private var tplPending: String? = null
+    private val tplPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(12)) { list ->
+        val id = tplPending
+        if (id != null && list.isNotEmpty()) {
+            val i = Intent(this, MainActivity::class.java)
+            i.putExtra("tpl", id)
+            i.putStringArrayListExtra("tplUris", ArrayList(list.map { it.toString() }))
+            val cd = android.content.ClipData.newRawUri("media", list[0])
+            for (k in 1 until list.size) cd.addItem(android.content.ClipData.Item(list[k]))
+            i.clipData = cd
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(i)
+        }
+    }
+
+    private fun fmt(ms: Long) = "%d:%02d".format(ms / 60000, (ms / 1000) % 60)
+
+    /** A stylised cover: three tilted photo frames in the template's colours. */
+    private fun coverView(t: Templates.T): View = object : View(this) {
+        override fun onDraw(c: android.graphics.Canvas) {
+            val w = width.toFloat(); val h = height.toFloat()
+            val bg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            bg.shader = android.graphics.LinearGradient(0f, 0f, w, h, t.c1, t.c2, android.graphics.Shader.TileMode.CLAMP)
+            c.drawRoundRect(0f, 0f, w, h, dp(16).toFloat(), dp(16).toFloat(), bg)
+            val fw = w * 0.56f; val fh = h * 0.5f
+            val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            val rot = floatArrayOf(-12f, 8f, -2f)
+            val dx = floatArrayOf(-0.07f, 0.07f, 0f)
+            for (k in 0..2) {
+                c.save()
+                c.translate(w / 2 + dx[k] * w, h * 0.42f)
+                c.rotate(rot[k])
+                val r = android.graphics.RectF(-fw / 2, -fh / 2, fw / 2, fh / 2)
+                p.style = android.graphics.Paint.Style.FILL; p.shader = null; p.color = Color.WHITE
+                c.drawRoundRect(r, dp(6).toFloat(), dp(6).toFloat(), p)
+                val q = android.graphics.RectF(r.left + dp(4), r.top + dp(4), r.right - dp(4), r.bottom - dp(4))
+                p.shader = android.graphics.LinearGradient(q.left, q.top, q.right, q.bottom,
+                    if (k == 2) t.c1 else Color.argb(255, (Color.red(t.c2) + 60).coerceAtMost(255), (Color.green(t.c2) + 60).coerceAtMost(255), (Color.blue(t.c2) + 60).coerceAtMost(255)),
+                    if (k == 2) t.c2 else t.c1, android.graphics.Shader.TileMode.CLAMP)
+                c.drawRoundRect(q, dp(4).toFloat(), dp(4).toFloat(), p)
+                c.restore()
+            }
+            p.shader = null; p.color = Color.WHITE; p.textAlign = android.graphics.Paint.Align.CENTER
+            p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); p.textSize = w * 0.085f
+            p.setShadowLayer(dp(3).toFloat(), 0f, dp(1).toFloat(), 0x99000000.toInt())
+            c.drawText(t.lookName.uppercase(), w / 2, h * 0.86f, p)
+        }
     }
 
     private fun discoverPage(): View {
@@ -504,9 +556,8 @@ class HomeActivity : AppCompatActivity() {
         val sg = GradientDrawable(); sg.cornerRadius = dp(14).toFloat(); sg.setColor(0xFFF1F3F6.toInt())
         sbar.background = sg
         val input = EditText(this)
-        input.hint = "Search music"; input.isSingleLine = true; input.setBackgroundColor(Color.TRANSPARENT)
+        input.hint = "Search templates"; input.isSingleLine = true; input.setBackgroundColor(Color.TRANSPARENT)
         input.setTextColor(0xFF111111.toInt()); input.setHintTextColor(0xFF9AA0A8.toInt()); input.setPadding(dp(14), 0, dp(8), 0)
-        input.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
         sbar.addView(input, LinearLayout.LayoutParams(0, dp(46), 1f))
         val go = ImageView(this); go.setImageResource(R.drawable.ic_search); go.setColorFilter(0xFF111111.toInt()); go.scaleType = ImageView.ScaleType.CENTER
         sbar.addView(go, LinearLayout.LayoutParams(dp(46), dp(46)))
@@ -523,101 +574,62 @@ class HomeActivity : AppCompatActivity() {
         list.setPadding(0, 0, 0, dp(20))
         sc.addView(list)
         page.addView(sc, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        var gen = 0
+        var catIdx = 0
         val chipViews = ArrayList<TextView>()
-        fun run(query: String, ci: Int) {
-            val my = ++gen
-            stopPlayer()
-            list.removeAllViews()
-            val msg = TextView(this); msg.text = "Loading…"; msg.setTextColor(0xFF8A8F98.toInt()); msg.setPadding(0, dp(20), 0, 0); list.addView(msg)
-            val jid = SoundsData.jamendoId(this)
-            val url = SoundsData.url(jid, query, if (query.isBlank() || ci < 0) 0 else 1, true, 1)
-            Thread {
-                try {
-                    val tracks = SoundsData.parse(SoundsData.cachedText(this, url), jid.isNotBlank(), true).first
-                    runOnUiThread { if (my == gen && cur == 1) fillTracks(list, tracks) }
-                } catch (e: Exception) {
-                    runOnUiThread { if (my == gen && cur == 1) msg.text = "Could not load music. Check your internet connection." }
-                }
-            }.start()
+        fun refresh() {
+            val q = input.text.toString().trim().lowercase()
+            val cat = Templates.CATS[catIdx]
+            fillTemplates(list, Templates.ALL.filter { (cat == "All" || it.cat == cat) && (q.isEmpty() || it.name.lowercase().contains(q) || it.desc.lowercase().contains(q)) })
         }
-        fun pick(ci: Int) {
+        fun style() {
             chipViews.forEachIndexed { k, t ->
                 val g = GradientDrawable(); g.cornerRadius = dp(18).toFloat()
-                g.setColor(Color.WHITE); g.setStroke(dp(if (k == ci) 2 else 1), if (k == ci) 0xFF111111.toInt() else 0xFFD5D9DF.toInt())
-                t.background = g; t.setTypeface(null, if (k == ci) Typeface.BOLD else Typeface.NORMAL)
+                g.setColor(Color.WHITE); g.setStroke(dp(if (k == catIdx) 2 else 1), if (k == catIdx) 0xFF111111.toInt() else 0xFFD5D9DF.toInt())
+                t.background = g; t.setTypeface(null, if (k == catIdx) Typeface.BOLD else Typeface.NORMAL)
             }
-            run(if (ci == 0) "" else SoundsData.CATS[ci], ci)
         }
-        SoundsData.CATS.forEachIndexed { k, name ->
+        Templates.CATS.forEachIndexed { k, name ->
             val t = TextView(this)
             t.text = name; t.textSize = 15f; t.setTextColor(0xFF111111.toInt()); t.setPadding(dp(16), dp(8), dp(16), dp(8))
-            t.setOnClickListener { input.setText(""); pick(k) }
+            t.setOnClickListener { catIdx = k; style(); refresh() }
             cr.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.setMargins(0, 0, dp(8), 0) })
             chipViews.add(t)
         }
-        val doSearch = {
-            val q = input.text.toString().trim()
-            if (q.isNotEmpty()) {
-                chipViews.forEach { t -> val g = GradientDrawable(); g.cornerRadius = dp(18).toFloat(); g.setColor(Color.WHITE); g.setStroke(dp(1), 0xFFD5D9DF.toInt()); t.background = g }
-                run(q, -1)
-            }
-            (getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
-        }
-        go.setOnClickListener { doSearch() }
-        input.setOnEditorActionListener { _, _, _ -> doSearch(); true }
-        pick(0)
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(e: android.text.Editable?) { refresh() }
+            override fun beforeTextChanged(a: CharSequence?, b: Int, c: Int, d: Int) {}
+            override fun onTextChanged(a: CharSequence?, b: Int, c: Int, d: Int) {}
+        })
+        style(); refresh()
         return page
     }
 
-    private var badge: TextView? = null
-
-    private fun fillTracks(list: LinearLayout, tracks: List<SoundsPage.Track>) {
+    private fun fillTemplates(list: LinearLayout, items: List<Templates.T>) {
         list.removeAllViews()
-        if (tracks.isEmpty()) { val m = TextView(this); m.text = "No music found."; m.setTextColor(0xFF8A8F98.toInt()); m.setPadding(0, dp(20), 0, 0); list.addView(m); return }
+        if (items.isEmpty()) { val m = TextView(this); m.text = "No templates found."; m.setTextColor(0xFF8A8F98.toInt()); m.setPadding(0, dp(20), 0, 0); list.addView(m); return }
         val w = (resources.displayMetrics.widthPixels - dp(32) - dp(12)) / 2
-        val grads = listOf(0xFF6FD3F2, 0xFFFF9F6B, 0xFF7ED67A, 0xFFA98BFF, 0xFFFF7FA8, 0xFF5FD4C8, 0xFFFFC94D, 0xFF7B96FF)
         var i = 0
-        while (i < tracks.size) {
+        while (i < items.size) {
             val row = LinearLayout(this)
             for (k in 0..1) {
-                val t = tracks.getOrNull(i + k)
+                val t = items.getOrNull(i + k)
                 if (t == null) { row.addView(View(this), LinearLayout.LayoutParams(w, 1)); continue }
                 val cell = LinearLayout(this)
                 cell.orientation = LinearLayout.VERTICAL
+                cell.setOnClickListener { templatePage(t) }
                 val cover = FrameLayout(this)
-                val gc = grads[Math.abs(t.id.hashCode()) % grads.size].toInt()
-                val cg = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(gc, 0xFF1B1F27.toInt()))
-                cg.cornerRadius = dp(16).toFloat()
-                cover.background = cg
-                cover.clipToOutline = true
-                val ci = ImageView(this)
-                ci.scaleType = ImageView.ScaleType.CENTER_CROP
-                val ph = ImageView(this); ph.setImageResource(R.drawable.ic_music); ph.setColorFilter(0x88FFFFFF.toInt())
-                cover.addView(ph, FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER))
-                cover.addView(ci, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                t.thumb?.let { u -> Thread { val b = SoundsData.cover(this, u); if (b != null) runOnUiThread { ci.setImageBitmap(b) } }.start() }
-                val sec = t.durMs / 1000
-                val pl = TextView(this)
-                pl.text = "▶  " + (if (sec > 0) "%d:%02d".format(sec / 60, sec % 60) else "")
-                pl.textSize = 13f; pl.setTextColor(Color.WHITE); pl.setTypeface(null, Typeface.BOLD)
-                pl.setPadding(dp(8), dp(4), dp(8), dp(4))
-                val pg = GradientDrawable(); pg.cornerRadius = dp(10).toFloat(); pg.setColor(0x99000000.toInt()); pl.background = pg
-                cover.addView(pl, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).also { it.setMargins(dp(8), 0, 0, dp(8)) })
-                val use = TextView(this)
-                use.text = "Use"; use.textSize = 13f; use.setTypeface(null, Typeface.BOLD); use.setTextColor(0xFF111111.toInt())
-                use.setPadding(dp(14), dp(6), dp(14), dp(6))
-                val ug = GradientDrawable(); ug.cornerRadius = dp(14).toFloat(); ug.setColor(Color.WHITE); use.background = ug
-                use.setOnClickListener { useTrack(t) }
-                cover.addView(use, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).also { it.setMargins(0, 0, dp(8), dp(8)) })
-                cover.setOnClickListener { playTrack(t, pl) }
-                cell.addView(cover, LinearLayout.LayoutParams(w, (w * 1.15f).toInt()))
+                cover.addView(coverView(t), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                val info = TextView(this)
+                info.text = "⏱ " + fmt(t.totalMs) + "   ▣ " + t.maxClips
+                info.textSize = 12f; info.setTextColor(Color.WHITE); info.setTypeface(null, Typeface.BOLD)
+                cover.addView(info, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).also { it.setMargins(dp(10), 0, 0, dp(8)) })
+                cell.addView(cover, LinearLayout.LayoutParams(w, (w * 1.45f).toInt()))
                 val title = TextView(this)
-                title.text = t.title.ifBlank { "Music" }; title.textSize = 15f; title.setTextColor(0xFF111111.toInt()); title.maxLines = 1; title.ellipsize = android.text.TextUtils.TruncateAt.END
+                title.text = t.name; title.textSize = 16f; title.setTextColor(0xFF111111.toInt()); title.maxLines = 1
                 title.setPadding(0, dp(8), 0, 0)
                 cell.addView(title)
                 val by = TextView(this)
-                by.text = t.creator.ifBlank { "Unknown" } + " · " + t.licenseName; by.textSize = 12f; by.setTextColor(0xFF8A8F98.toInt()); by.maxLines = 1; by.ellipsize = android.text.TextUtils.TruncateAt.END
+                by.text = t.desc; by.textSize = 12f; by.setTextColor(0xFF8A8F98.toInt()); by.maxLines = 1; by.ellipsize = android.text.TextUtils.TruncateAt.END
                 cell.addView(by)
                 row.addView(cell, LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.setMargins(if (k == 1) dp(12) else 0, 0, 0, dp(16)) })
             }
@@ -626,49 +638,42 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    private fun playTrack(t: SoundsPage.Track, pl: TextView) {
-        val was = playingId == t.id
-        stopPlayer()
-        if (was) return
-        playingId = t.id
-        badge = pl
-        val base = pl.text.toString().removePrefix("▶  ")
-        pl.text = "❚❚  $base"
-        try {
-            val mp = android.media.MediaPlayer()
-            mp.setAudioAttributes(android.media.AudioAttributes.Builder().setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).setUsage(android.media.AudioAttributes.USAGE_MEDIA).build())
-            mp.setDataSource(t.url)
-            mp.setOnPreparedListener { if (playingId == t.id) it.start() }
-            mp.setOnErrorListener { _, _, _ -> toast("Could not play this track"); stopPlayer(); true }
-            mp.setOnCompletionListener { stopPlayer() }
-            mp.prepareAsync()
-            player = mp
-        } catch (e: Exception) { toast("Could not play this track"); stopPlayer() }
-    }
-
-    private fun useTrack(t: SoundsPage.Track) {
-        stopPlayer()
-        toast("Downloading…")
-        Thread {
-            try {
-                val dir = java.io.File(filesDir, "music").apply { mkdirs() }
-                val f = java.io.File(dir, "dl_" + t.id.filter { it.isLetterOrDigit() }.take(40) + "." + t.ext.ifBlank { "mp3" })
-                if (!f.exists() || f.length() < 1000) {
-                    val tmp = java.io.File(dir, f.name + ".tmp")
-                    SoundsData.open(t.url).inputStream.use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
-                    tmp.renameTo(f)
-                }
-                val info = MediaProbe.probe(this, android.net.Uri.fromFile(f))
-                val dur = info?.durationMs ?: t.durMs
-                if (dur <= 0) throw java.io.IOException("unreadable")
-                val uri = android.net.Uri.fromFile(f).toString()
-                SoundsPage.saveCredit(this, uri, t)
-                runOnUiThread {
-                    startActivity(Intent(this, MainActivity::class.java).putExtra("pick", true)
-                        .putExtra("audioUri", uri).putExtra("audioDur", dur).putExtra("audioName", t.title.ifBlank { "Music" }))
-                }
-            } catch (_: Exception) { runOnUiThread { toast("Could not download this track") } }
-        }.start()
+    /** Full-screen template page like CapCut's: big preview, details and a "Use template" button. */
+    private fun templatePage(t: Templates.T) {
+        val d = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(0, dp(40), 0, 0)
+        val back = ImageView(this)
+        back.setImageResource(R.drawable.ic_chevron); back.setColorFilter(Color.WHITE); back.scaleType = ImageView.ScaleType.CENTER
+        back.setOnClickListener { d.dismiss() }
+        col.addView(back, LinearLayout.LayoutParams(dp(52), dp(52)))
+        val sc = ScrollView(this)
+        val inner = LinearLayout(this)
+        inner.orientation = LinearLayout.VERTICAL
+        inner.setPadding(dp(16), dp(4), dp(16), dp(16))
+        val sw = resources.displayMetrics.widthPixels - dp(32)
+        inner.addView(coverView(t), LinearLayout.LayoutParams(sw, (sw * 1.1f).toInt()))
+        val nm = TextView(this); nm.text = t.name; nm.textSize = 22f; nm.setTypeface(null, Typeface.BOLD); nm.setTextColor(Color.WHITE); nm.setPadding(0, dp(14), 0, 0)
+        inner.addView(nm)
+        val by = TextView(this); by.text = "@GetCut  ·  ⏱ " + fmt(t.totalMs) + "   ▣ up to " + t.maxClips; by.textSize = 14f; by.setTextColor(0xFFB0B5BD.toInt()); by.setPadding(0, dp(4), 0, dp(10))
+        inner.addView(by)
+        t.notes().forEach { n ->
+            val x = TextView(this); x.text = "•  $n"; x.textSize = 14f; x.setTextColor(0xFFE3E6EA.toInt()); x.setPadding(0, dp(3), 0, dp(3))
+            inner.addView(x)
+        }
+        sc.addView(inner)
+        col.addView(sc, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val btn = TextView(this)
+        btn.text = "Use template"; btn.textSize = 17f; btn.setTypeface(null, Typeface.BOLD); btn.setTextColor(0xFF06222A.toInt()); btn.gravity = Gravity.CENTER
+        val bg = GradientDrawable(); bg.cornerRadius = dp(12).toFloat(); bg.setColor(0xFF00D1E8.toInt()); btn.background = bg
+        btn.setOnClickListener { tplPending = t.id; d.dismiss(); toast("Pick up to ${t.maxClips} photos or videos"); tplPicker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageAndVideo)) }
+        col.addView(btn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)).also { it.setMargins(dp(16), dp(8), dp(16), dp(18)) })
+        root.addView(col, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        d.setContentView(root)
+        d.show()
     }
 
     override fun onPause() { super.onPause(); stopPlayer() }

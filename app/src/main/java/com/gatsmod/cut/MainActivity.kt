@@ -227,6 +227,10 @@ class MainActivity : AppCompatActivity() {
                 engine.refresh()
                 if (!project.isEmpty()) engine.seekTo(0)
             }
+        } else if (intent.hasExtra("tpl")) {
+            val tid = intent.getStringExtra("tpl") ?: ""
+            val us = (intent.getStringArrayListExtra("tplUris") ?: arrayListOf()).map { Uri.parse(it) }
+            ui.postDelayed({ buildFromTemplate(tid, us) }, 250)
         } else if (intent.getBooleanExtra("pick", false)) {
             pendingTool = intent.getStringExtra("autoTool")
             intent.getStringExtra("audioUri")?.let { pendingAudio = Triple(it, intent.getLongExtra("audioDur", 0L), intent.getStringExtra("audioName") ?: "Music") }
@@ -387,6 +391,73 @@ class MainActivity : AppCompatActivity() {
             contentResolver.openInputStream(u)?.use { i -> f.outputStream().use { o -> i.copyTo(o, 256 * 1024) } } ?: return u
             Uri.fromFile(f)
         } catch (e: Exception) { u }
+    }
+
+    private class Spec(val uri: String, val durMs: Long, val w: Int, val h: Int, val audio: Boolean, val fps: Float, val label: String, val still: Boolean)
+
+    /** Builds a finished edit from a Discover template and the photos / videos the person picked. */
+    private fun buildFromTemplate(tid: String, uris: List<Uri>) {
+        val t = Templates.byId(tid)
+        if (t == null || uris.isEmpty()) { toast("Could not open this template"); return }
+        val use = uris.take(t.maxClips)
+        runWork("Making \"" + t.name + "\"") { progress ->
+            val specs = ArrayList<Spec>()
+            use.forEachIndexed { i, src ->
+                if (!progress(i * 100 / use.size)) return@runWork null
+                val mime = contentResolver.getType(src) ?: ""
+                val name = MediaProbe.displayName(this, src)
+                val u = keepAccess(src, name)
+                if (mime.startsWith("image")) {
+                    val bmp = Templates.stillFrame(this, u)
+                    if (bmp != null) {
+                        val out = File(File(filesDir, "tpl"), "T_" + System.currentTimeMillis() + "_" + i + ".mp4")
+                        val res = FrameVideo.write(out, 30, (t.slotMs * 30 / 1000).toInt(), 5_000_000, { k -> if (k == 0) bmp else null }, { true })
+                        if (res != null) specs.add(Spec(Uri.fromFile(res.file).toString(), res.durationMs, res.width, res.height, false, 30f, name, true))
+                    }
+                } else {
+                    val info = MediaProbe.probe(this, u)
+                    if (info != null && info.hasVideo && info.durationMs > 0)
+                        specs.add(Spec(u.toString(), min(info.durationMs, t.slotMs), info.displayW, info.displayH, info.hasAudio, info.fps, name, false))
+                }
+            }
+            if (specs.isEmpty()) return@runWork null
+            return@runWork {
+                for (s in specs) {
+                    val c = Clip(id = project.newId(), kind = LaneKind.VIDEO, uri = s.uri, srcInMs = 0, srcOutMs = s.durMs, srcTotalMs = s.durMs,
+                        label = s.label, width = s.w, height = s.h, hasAudio = s.audio, fps = s.fps)
+                    t.look(c)
+                    if (s.still && t.kenBurns) c.keyframes = mutableListOf(Keyframe(0, 1f, 0f, 0f, 0f), Keyframe(c.lengthMs, 1.14f, 0f, 0f, 0f))
+                    if (!s.still && t.music != null) c.volume = 0.3f
+                    project.main.add(c)
+                }
+                for (i in 0 until project.main.size - 1) {
+                    val a = project.main[i]; val b = project.main[i + 1]
+                    val ms = min(600L, min(a.lengthMs, b.lengthMs) / 3)
+                    if (t.trans != null) { a.animOut = t.trans.first; b.animIn = t.trans.second; a.animOutMs = ms; b.animInMs = ms }
+                    else if (t.dipMs > 0) { val d = min(t.dipMs, ms); a.fadeOutMs = d; b.fadeInMs = d }
+                }
+                project.main.firstOrNull()?.let { it.fadeInMs = min(500L, it.lengthMs / 3) }
+                project.main.lastOrNull()?.let { it.fadeOutMs = min(800L, it.lengthMs / 3) }
+                project.canvasAspect = Templates.ASPECT
+                project.relayout()
+                val total = project.totalMs()
+                if (t.title != null) project.text.add(Clip(id = project.newId(), kind = LaneKind.TEXT, startMs = 0, text = t.title, label = "Title",
+                    durMs = min(3000L, total), sizeFrac = 0.1f, posY = 0.5f, color = t.titleColor, fadeInMs = 400, fadeOutMs = 400))
+                val mi = SoundGen.MUSIC.firstOrNull { it.id == t.music }
+                if (mi != null) {
+                    val f = SoundGen.ensureMusic(this, mi)
+                    val dur = (mi.seconds * 1000).toLong()
+                    project.audio.add(Clip(id = project.newId(), kind = LaneKind.AUDIO, startMs = 0, uri = Uri.fromFile(f).toString(),
+                        srcInMs = 0, srcOutMs = min(dur, total), srcTotalMs = dur, label = mi.name, fadeOutMs = min(1500L, total / 3)))
+                }
+                project.selectedId = -1L
+                projectName = t.name
+                engine.refresh(); engine.seekTo(0)
+                afterEdit()
+                if (Branding.endingOn(this)) ui.postDelayed({ addEnding(true) }, 300)
+                toast("Template ready - tap a clip to change anything")
+            }
+        }
     }
 
     private var pendingTool: String? = null
