@@ -15,13 +15,94 @@ object Samples {
     const val W = 360
     const val H = 640
     private var cache: List<Bitmap>? = null
+    @Volatile private var real: List<Bitmap>? = null
+    private val QUERIES = listOf("sunset beach", "mountain lake landscape", "city skyline night", "flower field", "autumn forest path", "travel adventure", "woman portrait nature", "coffee cafe", "sports car", "winter snow", "wedding couple", "friends party")
+
+    /** Real free photos (Openverse, Creative Commons) when they could be downloaded, otherwise the pictures drawn in code. */
+    fun get(): List<Bitmap> = real ?: fallback()
 
     @Synchronized
-    fun get(): List<Bitmap> {
+    private fun fallback(): List<Bitmap> {
         cache?.let { return it }
         val l = listOf(sunset(), mountains(), city(), meadow(), autumn())
         cache = l
         return l
+    }
+
+    /** Loads saved sample photos at once and refreshes them from the internet about once a week. */
+    fun init(ctx: Context) {
+        val app = ctx.applicationContext
+        Thread {
+            try {
+                loadCached(app)
+                val stamp = java.io.File(java.io.File(app.filesDir, "samples"), "stamp")
+                if (real == null || System.currentTimeMillis() - stamp.lastModified() > 7L * 24 * 3600 * 1000) download(app)
+            } catch (_: Throwable) {}
+        }.also { it.priority = Thread.MIN_PRIORITY }.start()
+    }
+
+    private fun loadCached(ctx: Context) {
+        val dir = java.io.File(ctx.filesDir, "samples")
+        val files = dir.listFiles { f -> f.name.endsWith(".jpg") }?.sortedBy { it.name } ?: return
+        val l = ArrayList<Bitmap>()
+        for (f in files) {
+            try {
+                val o = BitmapFactory.Options(); o.inJustDecodeBounds = true; BitmapFactory.decodeFile(f.path, o)
+                if (o.outWidth <= 0) continue
+                var s = 1; while (o.outWidth / s > 800) s *= 2
+                BitmapFactory.decodeFile(f.path, BitmapFactory.Options().apply { inSampleSize = s })?.let { l.add(it) }
+            } catch (_: Throwable) {}
+        }
+        if (l.size >= 3) real = l
+    }
+
+    private fun download(ctx: Context) {
+        val dir = java.io.File(ctx.filesDir, "samples"); dir.mkdirs()
+        val credits = org.json.JSONArray()
+        var k = 0
+        val old = dir.listFiles { f -> f.name.startsWith("n") && f.name.endsWith(".jpg") }
+        old?.forEach { it.delete() }
+        for (q in QUERIES) {
+            if (k >= 10) break
+            try {
+                val url = "https://api.openverse.org/v1/images/?q=" + java.net.URLEncoder.encode(q, "UTF-8") + "&license_type=commercial&aspect_ratio=tall&size=medium&page_size=8"
+                val arr = org.json.JSONObject(SoundsData.cachedText(ctx, url, 7L * 24 * 3600 * 1000)).optJSONArray("results") ?: continue
+                var got = 0
+                for (i in 0 until arr.length()) {
+                    if (got >= 1) break
+                    val o = arr.getJSONObject(i)
+                    val src = o.optString("thumbnail").ifBlank { o.optString("url") }
+                    if (src.isBlank()) continue
+                    try {
+                        val f = java.io.File(dir, "n$k.jpg")
+                        SoundsData.open(src).inputStream.use { ins -> f.outputStream().use { out -> val buf = ByteArray(16384); var tot = 0; while (true) { val r = ins.read(buf); if (r < 0) break; tot += r; if (tot > 4_000_000) throw java.io.IOException("big"); out.write(buf, 0, r) } } }
+                        val bo = BitmapFactory.Options(); bo.inJustDecodeBounds = true; BitmapFactory.decodeFile(f.path, bo)
+                        if (bo.outWidth < 200) { f.delete(); continue }
+                        credits.put(org.json.JSONObject().put("title", o.optString("title")).put("creator", o.optString("creator")).put("license", o.optString("license").uppercase() + " " + o.optString("license_version")).put("link", o.optString("foreign_landing_url")))
+                        k++; got++
+                    } catch (_: Exception) {}
+                }
+            } catch (_: Exception) {}
+        }
+        if (k >= 3) {
+            dir.listFiles { f -> f.name.startsWith("s") && f.name.endsWith(".jpg") }?.forEach { it.delete() }
+            for (i in 0 until k) java.io.File(dir, "n$i.jpg").renameTo(java.io.File(dir, "s$i.jpg"))
+            java.io.File(dir, "credits.json").writeText(credits.toString())
+            java.io.File(dir, "stamp").writeText(System.currentTimeMillis().toString())
+            loadCached(ctx)
+        } else {
+            dir.listFiles { f -> f.name.startsWith("n") && f.name.endsWith(".jpg") }?.forEach { it.delete() }
+        }
+    }
+
+    /** Text for the credits dialog. */
+    fun credits(ctx: Context): String {
+        val f = java.io.File(java.io.File(ctx.filesDir, "samples"), "credits.json")
+        if (!f.exists() || real == null) return "The sample pictures in the previews are drawn inside the app, so there is nothing to credit."
+        return try {
+            val a = org.json.JSONArray(f.readText())
+            (0 until a.length()).joinToString("\n\n") { val o = a.getJSONObject(it); "\"" + o.optString("title").ifBlank { "Photo" } + "\" by " + o.optString("creator").ifBlank { "unknown" } + " (" + o.optString("license") + ")\n" + o.optString("link") }
+        } catch (_: Exception) { "No credits found." }
     }
 
     private fun bmp(draw: (Canvas, Paint) -> Unit): Bitmap {
@@ -147,11 +228,12 @@ object Samples {
 
 /** Plays a template on the sample pictures in a loop: its look, zoom, transitions and title, as the finished video will use them. */
 class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
-    private val scenes = Samples.get()
+    private val scenes: List<Bitmap> get() = Samples.get()
     private val n = min(t.maxClips, 5)
     private val slotD = (t.slotMs * 0.65f).coerceIn(1000f, 1700f)
     private val total = n * slotD
-    private val t0 = SystemClock.uptimeMillis()
+    private val off = abs(t.id.hashCode()) % 7
+    private val t0 = SystemClock.uptimeMillis() - (abs(t.id.hashCode()) % 1500)
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val clip = Clip(id = 0, kind = LaneKind.VIDEO).also { t.look(it) }
     private val cf: ColorMatrixColorFilter = buildFilter()
@@ -188,7 +270,7 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
 
     private fun draw(cv: Canvas, idx: Int, s: Float, tx: Float, ty: Float, rot: Float, alpha: Float) {
         if (alpha <= 0.01f) return
-        val b = scenes[idx % scenes.size]
+        val sc0 = scenes; val b = sc0[(idx + off) % sc0.size]
         val sc = max(width.toFloat() / b.width, height.toFloat() / b.height)
         paint.colorFilter = cf
         paint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()

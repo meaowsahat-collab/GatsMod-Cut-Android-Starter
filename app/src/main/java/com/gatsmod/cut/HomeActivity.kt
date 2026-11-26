@@ -41,6 +41,7 @@ class HomeActivity : AppCompatActivity() {
         setTheme(R.style.Theme_GatsModCut)
         super.onCreate(savedInstanceState)
         SoundsData.preload(this)
+        Samples.init(this)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true
@@ -462,6 +463,9 @@ class HomeActivity : AppCompatActivity() {
                 .putExtra(Intent.EXTRA_TEXT, "Get Cut - free video editor: https://github.com/meaowsahat-collab/GatsMod-Cut-Android-Starter/releases/latest")
             startActivity(Intent.createChooser(i, "Share Get Cut"))
         })
+        body.addView(meRow(R.drawable.ic_copyright, "Template sample photo credits") {
+            android.app.AlertDialog.Builder(this).setTitle("Sample photo credits").setMessage(Samples.credits(this)).setPositiveButton("OK", null).show()
+        })
         body.addView(meRow(R.drawable.ic_help, "Help Center") {
             android.app.AlertDialog.Builder(this).setTitle("Help Center").setMessage("• New video: pick a video, then use the toolbar at the bottom.\n• Select a clip to see its tools (Split, Speed, Remove BG...).\n• Audio > Sounds: free music (Creative Commons). Audio > Copyright shows the credits to put in your video description.\n• AI Lab: pick a video and the tool opens by itself.\n• Updates: Me > Check for updates.").setPositiveButton("OK", null).show()
         })
@@ -529,7 +533,20 @@ class HomeActivity : AppCompatActivity() {
         sbar.addView(input, LinearLayout.LayoutParams(0, dp(46), 1f))
         val go = ImageView(this); go.setImageResource(R.drawable.ic_search); go.setColorFilter(0xFF111111.toInt()); go.scaleType = ImageView.ScaleType.CENTER
         sbar.addView(go, LinearLayout.LayoutParams(dp(46), dp(46)))
-        page.addView(sbar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val srow = LinearLayout(this)
+        srow.gravity = Gravity.CENTER_VERTICAL
+        srow.addView(sbar, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val auto = LinearLayout(this)
+        auto.orientation = LinearLayout.VERTICAL
+        auto.gravity = Gravity.CENTER_HORIZONTAL
+        auto.setPadding(dp(12), 0, 0, 0)
+        val ai = ImageView(this); ai.setImageResource(R.drawable.ic_ai); ai.setColorFilter(0xFF111111.toInt())
+        auto.addView(ai, LinearLayout.LayoutParams(dp(28), dp(28)))
+        val at = TextView(this); at.text = "AutoCut"; at.textSize = 11f; at.setTextColor(0xFF111111.toInt()); at.gravity = Gravity.CENTER
+        auto.addView(at)
+        auto.setOnClickListener { tplPending = "vlog"; toast("AutoCut: pick your photos and videos, Get Cut makes the edit"); tplPicker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageAndVideo)) }
+        srow.addView(auto)
+        page.addView(srow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val chips = HorizontalScrollView(this)
         chips.isHorizontalScrollBarEnabled = false
         val cr = LinearLayout(this)
@@ -547,7 +564,7 @@ class HomeActivity : AppCompatActivity() {
         fun refresh() {
             val q = input.text.toString().trim().lowercase()
             val cat = Templates.CATS[catIdx]
-            fillTemplates(list, Templates.ALL.filter { (cat == "All" || it.cat == cat) && (q.isEmpty() || it.name.lowercase().contains(q) || it.desc.lowercase().contains(q)) })
+            fillTemplates(list, Templates.EVERY.filter { (cat == "All" || it.cat == cat) && (q.isEmpty() || it.name.lowercase().contains(q) || it.desc.lowercase().contains(q)) })
         }
         fun style() {
             chipViews.forEachIndexed { k, t ->
@@ -558,7 +575,7 @@ class HomeActivity : AppCompatActivity() {
         }
         Templates.CATS.forEachIndexed { k, name ->
             val t = TextView(this)
-            t.text = name; t.textSize = 15f; t.setTextColor(0xFF111111.toInt()); t.setPadding(dp(16), dp(8), dp(16), dp(8))
+            t.text = if (name == "All") "For you" else name; t.textSize = 15f; t.setTextColor(0xFF111111.toInt()); t.setPadding(dp(16), dp(8), dp(16), dp(8))
             t.setOnClickListener { catIdx = k; style(); refresh() }
             cr.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.setMargins(0, 0, dp(8), 0) })
             chipViews.add(t)
@@ -596,9 +613,17 @@ class HomeActivity : AppCompatActivity() {
                 title.text = t.name; title.textSize = 16f; title.setTextColor(0xFF111111.toInt()); title.maxLines = 1
                 title.setPadding(0, dp(8), 0, 0)
                 cell.addView(title)
+                val cr = LinearLayout(this)
+                cr.gravity = Gravity.CENTER_VERTICAL
+                cr.setPadding(0, dp(4), 0, 0)
+                val av = TextView(this)
+                av.text = "G"; av.textSize = 11f; av.setTypeface(null, Typeface.BOLD); av.setTextColor(Color.WHITE); av.gravity = Gravity.CENTER
+                val avg = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(t.c1, t.c2)); avg.shape = GradientDrawable.OVAL; av.background = avg
+                cr.addView(av, LinearLayout.LayoutParams(dp(22), dp(22)))
                 val by = TextView(this)
-                by.text = t.desc; by.textSize = 12f; by.setTextColor(0xFF8A8F98.toInt()); by.maxLines = 1; by.ellipsize = android.text.TextUtils.TruncateAt.END
-                cell.addView(by)
+                by.text = "Get Cut"; by.textSize = 13f; by.setTextColor(0xFF6B717B.toInt()); by.maxLines = 1; by.setPadding(dp(8), 0, 0, 0)
+                cr.addView(by)
+                cell.addView(cr)
                 row.addView(cell, LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.setMargins(if (k == 1) dp(12) else 0, 0, 0, dp(16)) })
             }
             list.addView(row)

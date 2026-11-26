@@ -37,6 +37,8 @@ object Templates {
 
     val CATS = listOf("All", "Cinematic", "Vlog", "Photo", "Music", "Fun")
 
+    private fun fi(n: String) = Fx.FILTERS.indexOfFirst { it.name == n }.coerceAtLeast(0)
+
     val ALL: List<T> = listOf(
         T("cine", "Cinematic Story", "Cinematic", "Moody, slow, film look", 0xFF1F3A4D.toInt(), 0xFF0B1620.toInt(),
             3000, 6, "epic", null, transName = "Zoom", trans = 1001 to 1, kenBurns = true, lookName = "Cinematic") { c ->
@@ -76,7 +78,44 @@ object Templates {
             c.fx = 8; c.fxAmount = 0.4f; c.brightness = 0.04f; c.saturation = 1.05f }
     )
 
-    fun byId(id: String) = ALL.firstOrNull { it.id == id }
+    val MORE: List<T> = listOf(
+        T("lux", "Luxury Life", "Cinematic", "Teal and orange, slow zooms", 0xFF263238.toInt(), 0xFFFF8F00.toInt(),
+            2200, 8, "epic", null, transName = "Zoom", trans = 1001 to 1, kenBurns = true, lookName = "Teal Orange") { c ->
+            c.filter = fi("Teal Orange"); c.fx = 1; c.fxAmount = 0.4f },
+        T("ny27", "New Year 2027", "Fun", "Pops and flashes with a big title", 0xFF1A237E.toInt(), 0xFFFFC107.toInt(),
+            1300, 8, "funk", "HAPPY 2027", titleColor = 0xFFFFD54F.toInt(), transName = "Flash", trans = 1005 to 5, kenBurns = true, lookName = "Punch") { c ->
+            c.filter = fi("Punch") },
+        T("summer", "Summer Trip", "Vlog", "Sunny colours, quick slides", 0xFFFFCA28.toInt(), 0xFF29B6F6.toInt(),
+            1800, 10, "pop", "Summer", transName = "Slide left", trans = 1007 to 8, kenBurns = true, lookName = "Sunny") { c ->
+            c.filter = fi("Sunny") },
+        T("rose", "Love Story", "Photo", "Rose tones, soft fades", 0xFFF06292.toInt(), 0xFF880E4F.toInt(),
+            3000, 6, "dream", "Love Story", transName = "Dip to black", trans = null, dipMs = 500, kenBurns = true, lookName = "Rose") { c ->
+            c.filter = fi("Rose"); c.fx = 8; c.fxAmount = 0.35f },
+        T("gym", "Beast Mode", "Music", "Hard cuts, dark and punchy", 0xFF212121.toInt(), 0xFFD50000.toInt(),
+            800, 10, "dark", "NO PAIN", transName = "Glitch", trans = 1014 to 14, kenBurns = false, lookName = "Dark punch") { c ->
+            c.filter = fi("Dark"); c.contrast = 1.2f; c.saturation = 1.1f; c.fx = 1; c.fxAmount = 0.5f },
+        T("cyber", "Night City", "Cinematic", "Cyber glow and glitches", 0xFF311B92.toInt(), 0xFF00E5FF.toInt(),
+            1500, 8, "dark", null, transName = "Glitch", trans = 1014 to 14, kenBurns = true, lookName = "Cyber") { c ->
+            c.filter = fi("Cyber"); c.fx = 4; c.fxAmount = 0.2f },
+        T("golden", "Golden Hour", "Vlog", "Warm golden light", 0xFFFFB300.toInt(), 0xFFBF360C.toInt(),
+            2600, 6, "lofi", null, transName = "Dip to black", trans = null, dipMs = 450, kenBurns = true, lookName = "Golden") { c ->
+            c.filter = fi("Golden"); c.fx = 8; c.fxAmount = 0.3f },
+        T("friends", "Friends Forever", "Fun", "Spins and candy colours", 0xFFAB47BC.toInt(), 0xFFFF7043.toInt(),
+            1200, 10, "funk", "Squad", transName = "Spin", trans = 1004 to 4, kenBurns = false, lookName = "Candy") { c ->
+            c.filter = fi("Candy") },
+        T("nature", "Nature Calm", "Photo", "Forest greens, gentle slides", 0xFF2E7D32.toInt(), 0xFF004D40.toInt(),
+            3000, 6, "dream", null, transName = "Slide up", trans = 1009 to 10, kenBurns = true, lookName = "Forest") { c ->
+            c.filter = fi("Forest") },
+        T("winter", "Cold Winter", "Cinematic", "Icy blue, slow and quiet", 0xFF90CAF9.toInt(), 0xFF0D47A1.toInt(),
+            3200, 6, "dream", null, transName = "Dip to black", trans = null, dipMs = 500, kenBurns = true, lookName = "Ice") { c ->
+            c.filter = fi("Ice"); c.fx = 8; c.fxAmount = 0.25f },
+        T("film", "Old Film", "Fun", "Faded tape with grain", 0xFF8D6E63.toInt(), 0xFF3E2723.toInt(),
+            2400, 6, "lofi", null, transName = "Dip to black", trans = null, dipMs = 400, kenBurns = true, lookName = "Film grain") { c ->
+            c.filter = fi("Film"); c.fx = 5; c.fxAmount = 0.5f }
+    )
+
+    fun byId(id: String) = (ALL + MORE).firstOrNull { it.id == id }
+    val EVERY: List<T> get() = ALL + MORE
 
     /** Puts a photo on a 9:16 picture: the photo fitted in the middle over a blurred, enlarged copy of itself. */
     fun stillFrame(ctx: Context, uri: Uri): Bitmap? {
