@@ -464,6 +464,10 @@ class HomeActivity : AppCompatActivity() {
                 .putExtra(Intent.EXTRA_TEXT, "Get Cut - free video editor: https://github.com/meaowsahat-collab/GatsMod-Cut-Android-Starter/releases/latest")
             startActivity(Intent.createChooser(i, "Share Get Cut"))
         })
+        body.addView(meRow(R.drawable.ic_media, "Online templates", "refresh") {
+            toast("Loading…")
+            Templates.loadRemote(this, true) { st -> runOnUiThread { android.app.AlertDialog.Builder(this).setTitle("Online templates").setMessage(st + "\n\nTemplates in total: " + Templates.EVERY.size).setPositiveButton("OK", null).show(); if (cur == 4) showPage(4) } }
+        })
         body.addView(meRow(R.drawable.ic_copyright, "Template sample photo credits") {
             android.app.AlertDialog.Builder(this).setTitle("Sample photo credits").setMessage(Samples.credits(this)).setPositiveButton("OK", null).show()
         })

@@ -169,21 +169,28 @@ object Templates {
         return out
     }
 
+    @Volatile var status = "Not loaded yet"
+    private val URLS = listOf(REMOTE_URL, "https://cdn.jsdelivr.net/gh/meaowsahat-collab/GatsMod-Cut-Android-Starter@main/templates.json")
+
     /** Template list kept in the app's GitHub repository (templates.json): new templates appear without updating the app. */
-    fun loadRemote(ctx: Context, onChange: () -> Unit) {
+    fun loadRemote(ctx: Context, force: Boolean = false, onChange: (String) -> Unit) {
         val f = java.io.File(ctx.filesDir, "templates_remote.json")
-        try { if (f.exists()) remote = parse(f.readText()) } catch (_: Exception) {}
+        try { if (f.exists()) { remote = parse(f.readText()); status = "${remote.size} online templates (saved copy)" } } catch (e: Exception) { status = "Saved copy unreadable: ${e.message}" }
         Thread {
-            try {
-                if (System.currentTimeMillis() - f.lastModified() < 20 * 60 * 1000L && f.exists()) return@Thread
-                val text = SoundsData.open(REMOTE_URL).inputStream.bufferedReader().use { it.readText() }
-                val list = parse(text)
-                if (list.isNotEmpty()) {
-                    val changed = list.map { it.id + it.name } != remote.map { it.id + it.name }
+            if (!force && f.exists() && System.currentTimeMillis() - f.lastModified() < 20 * 60 * 1000L) { onChange(status); return@Thread }
+            var err = ""
+            for (u in URLS) {
+                try {
+                    val text = SoundsData.open(u).inputStream.bufferedReader().use { it.readText() }
+                    val list = parse(text)
+                    if (list.isEmpty()) { err = "The list was empty or unreadable"; continue }
                     f.writeText(text); remote = list
-                    if (changed) onChange()
-                }
-            } catch (_: Exception) {}
+                    status = "${list.size} online templates loaded"
+                    onChange(status); return@Thread
+                } catch (e: Exception) { err = (e.message ?: e.javaClass.simpleName) }
+            }
+            status = "Could not load online templates: $err"
+            onChange(status)
         }.also { it.priority = Thread.MIN_PRIORITY }.start()
     }
 
