@@ -515,38 +515,6 @@ class HomeActivity : AppCompatActivity() {
 
     private fun fmt(ms: Long) = "%d:%02d".format(ms / 60000, (ms / 1000) % 60)
 
-    /** A stylised cover: three tilted photo frames in the template's colours. */
-    private fun coverView(t: Templates.T): View = object : View(this) {
-        override fun onDraw(c: android.graphics.Canvas) {
-            val w = width.toFloat(); val h = height.toFloat()
-            val bg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-            bg.shader = android.graphics.LinearGradient(0f, 0f, w, h, t.c1, t.c2, android.graphics.Shader.TileMode.CLAMP)
-            c.drawRoundRect(0f, 0f, w, h, dp(16).toFloat(), dp(16).toFloat(), bg)
-            val fw = w * 0.56f; val fh = h * 0.5f
-            val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-            val rot = floatArrayOf(-12f, 8f, -2f)
-            val dx = floatArrayOf(-0.07f, 0.07f, 0f)
-            for (k in 0..2) {
-                c.save()
-                c.translate(w / 2 + dx[k] * w, h * 0.42f)
-                c.rotate(rot[k])
-                val r = android.graphics.RectF(-fw / 2, -fh / 2, fw / 2, fh / 2)
-                p.style = android.graphics.Paint.Style.FILL; p.shader = null; p.color = Color.WHITE
-                c.drawRoundRect(r, dp(6).toFloat(), dp(6).toFloat(), p)
-                val q = android.graphics.RectF(r.left + dp(4), r.top + dp(4), r.right - dp(4), r.bottom - dp(4))
-                p.shader = android.graphics.LinearGradient(q.left, q.top, q.right, q.bottom,
-                    if (k == 2) t.c1 else Color.argb(255, (Color.red(t.c2) + 60).coerceAtMost(255), (Color.green(t.c2) + 60).coerceAtMost(255), (Color.blue(t.c2) + 60).coerceAtMost(255)),
-                    if (k == 2) t.c2 else t.c1, android.graphics.Shader.TileMode.CLAMP)
-                c.drawRoundRect(q, dp(4).toFloat(), dp(4).toFloat(), p)
-                c.restore()
-            }
-            p.shader = null; p.color = Color.WHITE; p.textAlign = android.graphics.Paint.Align.CENTER
-            p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); p.textSize = w * 0.085f
-            p.setShadowLayer(dp(3).toFloat(), 0f, dp(1).toFloat(), 0x99000000.toInt())
-            c.drawText(t.lookName.uppercase(), w / 2, h * 0.86f, p)
-        }
-    }
-
     private fun discoverPage(): View {
         val page = LinearLayout(this)
         page.orientation = LinearLayout.VERTICAL
@@ -618,7 +586,7 @@ class HomeActivity : AppCompatActivity() {
                 cell.orientation = LinearLayout.VERTICAL
                 cell.setOnClickListener { templatePage(t) }
                 val cover = FrameLayout(this)
-                cover.addView(coverView(t), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                cover.addView(TemplatePreview(this, t), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 val info = TextView(this)
                 info.text = "⏱ " + fmt(t.totalMs) + "   ▣ " + t.maxClips
                 info.textSize = 12f; info.setTextColor(Color.WHITE); info.setTypeface(null, Typeface.BOLD)
@@ -655,10 +623,10 @@ class HomeActivity : AppCompatActivity() {
         inner.orientation = LinearLayout.VERTICAL
         inner.setPadding(dp(16), dp(4), dp(16), dp(16))
         val sw = resources.displayMetrics.widthPixels - dp(32)
-        inner.addView(coverView(t), LinearLayout.LayoutParams(sw, (sw * 1.1f).toInt()))
+        inner.addView(TemplatePreview(this, t), LinearLayout.LayoutParams(sw, (sw * 1.45f).toInt()))
         val nm = TextView(this); nm.text = t.name; nm.textSize = 22f; nm.setTypeface(null, Typeface.BOLD); nm.setTextColor(Color.WHITE); nm.setPadding(0, dp(14), 0, 0)
         inner.addView(nm)
-        val by = TextView(this); by.text = "@GetCut  ·  ⏱ " + fmt(t.totalMs) + "   ▣ up to " + t.maxClips; by.textSize = 14f; by.setTextColor(0xFFB0B5BD.toInt()); by.setPadding(0, dp(4), 0, dp(10))
+        val by = TextView(this); by.text = "Preview uses sample scenes; your photos and videos replace them  ·  ⏱ " + fmt(t.totalMs) + "   ▣ up to " + t.maxClips; by.textSize = 14f; by.setTextColor(0xFFB0B5BD.toInt()); by.setPadding(0, dp(4), 0, dp(10))
         inner.addView(by)
         t.notes().forEach { n ->
             val x = TextView(this); x.text = "•  $n"; x.textSize = 14f; x.setTextColor(0xFFE3E6EA.toInt()); x.setPadding(0, dp(3), 0, dp(3))
@@ -673,7 +641,21 @@ class HomeActivity : AppCompatActivity() {
         col.addView(btn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)).also { it.setMargins(dp(16), dp(8), dp(16), dp(18)) })
         root.addView(col, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         d.setContentView(root)
+        d.setOnDismissListener { stopPlayer() }
         d.show()
+        val mi = SoundGen.MUSIC.firstOrNull { it.id == t.music }
+        if (mi != null) Thread {
+            try {
+                val f = SoundGen.ensureMusic(this, mi)
+                runOnUiThread {
+                    if (d.isShowing) {
+                        val mp = android.media.MediaPlayer()
+                        mp.setDataSource(f.path); mp.isLooping = true; mp.prepare(); mp.start()
+                        stopPlayer(); player = mp
+                    }
+                }
+            } catch (_: Exception) {}
+        }.start()
     }
 
     override fun onPause() { super.onPause(); stopPlayer() }
