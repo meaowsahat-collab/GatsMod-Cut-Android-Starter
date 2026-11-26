@@ -42,6 +42,7 @@ class HomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         SoundsData.preload(this)
         Samples.init(this)
+        Templates.loadRemote(this) { runOnUiThread { if (cur == 1 && !isFinishing) showPage(1) } }
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true

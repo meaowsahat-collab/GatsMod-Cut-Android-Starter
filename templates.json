@@ -1,0 +1,8 @@
+[
+  {"id":"glam","name":"Glam Sparkle","cat":"Photo","desc":"Warm glow with twinkling sparkles","c1":"#FFB74D","c2":"#6D4C41","slotMs":1800,"maxClips":6,"music":"dream","trans":"Dissolve","kenBurns":true,"look":"Golden","lookName":"Golden glow","fx":8,"fxAmount":0.35,"sparkle":true},
+  {"id":"stardust","name":"Stardust","cat":"Fun","desc":"Pop cuts with sparkles","c1":"#7E57C2","c2":"#FF4081","slotMs":1200,"maxClips":8,"music":"pop","trans":"Pop","kenBurns":true,"look":"Candy","lookName":"Candy","sparkle":true,"title":"Shine"},
+  {"id":"blurrush","name":"Blur Rush","cat":"Music","desc":"Fast streaking swipes","c1":"#263238","c2":"#00BCD4","slotMs":850,"maxClips":10,"music":"funk","trans":"Motion blur","kenBurns":false,"look":"HDR","lookName":"HDR punch"},
+  {"id":"lux2","name":"Luxe Walk","cat":"Cinematic","desc":"Slow zooms, soft flash, rich colour","c1":"#3E2723","c2":"#D7CCC8","slotMs":2000,"maxClips":6,"music":"epic","trans":"Flash","kenBurns":true,"look":"Cinema","lookName":"Cinema","fx":1,"fxAmount":0.4},
+  {"id":"spinfun","name":"Spin Party","cat":"Fun","desc":"Spin cuts, bright and loud","c1":"#E91E63","c2":"#FFEB3B","slotMs":1000,"maxClips":10,"music":"funk","trans":"Spin","kenBurns":false,"look":"Vivid","lookName":"Vivid","title":"Party!"},
+  {"id":"misty","name":"Misty Morning","cat":"Vlog","desc":"Soft haze, slow dissolves","c1":"#B0BEC5","c2":"#546E7A","slotMs":2600,"maxClips":6,"music":"lofi","trans":"Dissolve","kenBurns":true,"look":"Haze","lookName":"Haze"}
+]

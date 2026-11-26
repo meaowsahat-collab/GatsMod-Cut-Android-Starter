@@ -355,6 +355,22 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
                 cv.drawRect(0f, 0f, w, h, paint); paint.shader = null
             }
         }
+        if (t.sparkle) {
+            val tick = SystemClock.uptimeMillis() / 380
+            paint.colorFilter = null; paint.shader = null; paint.style = Paint.Style.FILL
+            for (k in 0 until 9) {
+                rnd.setSeed(tick * 31 + k * 7919L)
+                val x = rnd.nextFloat() * w; val y = rnd.nextFloat() * h
+                val ph = ((SystemClock.uptimeMillis() % 380) / 380f)
+                val a = kotlin.math.sin(ph * Math.PI).toFloat()
+                val r = w * (0.03f + rnd.nextFloat() * 0.06f) * (0.4f + a)
+                paint.color = Color.argb((235 * a).toInt().coerceIn(0, 255), 255, 244, 200)
+                val path = Path(); val kk = r * 0.18f
+                path.moveTo(x, y - r); path.quadTo(x + kk, y - kk, x + r, y); path.quadTo(x + kk, y + kk, x, y + r)
+                path.quadTo(x - kk, y + kk, x - r, y); path.quadTo(x - kk, y - kk, x, y - r); path.close()
+                cv.drawPath(path, paint)
+            }
+        }
         // title
         if (t.title != null) {
             val ta = (now / total)

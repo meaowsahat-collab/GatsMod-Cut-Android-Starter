@@ -443,6 +443,16 @@ class MainActivity : AppCompatActivity() {
                 val total = project.totalMs()
                 if (t.title != null) project.text.add(Clip(id = project.newId(), kind = LaneKind.TEXT, startMs = 0, text = t.title, label = "Title",
                     durMs = min(3000L, total), sizeFrac = 0.1f, posY = 0.5f, color = t.titleColor, fadeInMs = 400, fadeOutMs = 400))
+                if (t.sparkle) {
+                    val sf = Templates.sparkleFile(this)
+                    val rnd = java.util.Random(7)
+                    val cnt = min(28, max(6, (total / 400).toInt()))
+                    for (k in 0 until cnt) {
+                        val st = (rnd.nextFloat() * max(1L, total - 700L)).toLong()
+                        project.addFree(Clip(id = project.newId(), kind = LaneKind.OVERLAY, startMs = st, uri = Uri.fromFile(sf).toString(), label = "Sparkle",
+                            durMs = 350L + rnd.nextInt(350), sizeFrac = 0.05f + rnd.nextFloat() * 0.12f, posX = 0.08f + rnd.nextFloat() * 0.84f, posY = 0.08f + rnd.nextFloat() * 0.84f))
+                    }
+                }
                 val mi = SoundGen.MUSIC.firstOrNull { it.id == t.music }
                 if (mi != null) {
                     val f = SoundGen.ensureMusic(this, mi)

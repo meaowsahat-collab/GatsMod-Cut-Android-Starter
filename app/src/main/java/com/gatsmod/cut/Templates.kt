@@ -21,17 +21,18 @@ object Templates {
         val slotMs: Long, val maxClips: Int,
         val music: String?, val title: String?, val titleColor: Int = Color.WHITE,
         val transName: String, val trans: Pair<Int, Int>?, val dipMs: Long = 0L,
-        val kenBurns: Boolean, val lookName: String, val look: (Clip) -> Unit
+        val kenBurns: Boolean, val lookName: String, val sparkle: Boolean = false, val look: (Clip) -> Unit
     ) {
         val totalMs: Long get() = slotMs * maxClips
         val musicName: String get() = SoundGen.MUSIC.firstOrNull { it.id == music }?.name ?: "No music"
-        fun notes(): List<String> = listOf(
+        fun notes(): List<String> = listOfNotNull(
             "Up to $maxClips photos or videos, ${"%.1f".format(slotMs / 1000f)} s each",
             "Look: $lookName",
             "Transition: $transName",
             "Music: $musicName" + if (music != null) " (made inside the app)" else "",
             if (title != null) "Title: \"$title\"" else "No title text",
-            if (kenBurns) "Slow zoom on photos" else "Photos stay still"
+            if (kenBurns) "Slow zoom on photos" else "Photos stay still",
+            if (sparkle) "Twinkling sparkles on top" else null
         )
     }
 
@@ -86,7 +87,7 @@ object Templates {
             1100, 10, "pop", null, transName = "Motion blur", trans = outFor(292) to 292, kenBurns = true, lookName = "Warm contrast") { c ->
             c.filter = fi("Golden"); c.contrast = 1.12f; c.saturation = 1.1f; c.fx = 1; c.fxAmount = 0.35f },
         T("morph", "Photo Dissolve", "Photo", "Two photos melting into each other", 0xFFFFAB91.toInt(), 0xFF8D6E63.toInt(),
-            1900, 6, "dream", null, transName = "Dissolve", trans = outFor(299) to 299, kenBurns = true, lookName = "Warm peach") { c ->
+            1900, 6, "dream", null, transName = "Dissolve", trans = outFor(299) to 299, kenBurns = true, lookName = "Warm peach", sparkle = true) { c ->
             c.filter = fi("Peach"); c.fx = 8; c.fxAmount = 0.3f; c.brightness = 0.02f },
         T("swipeblur", "Swipe Blur", "Fun", "Fast swipes with blur", 0xFF00ACC1.toInt(), 0xFF7E57C2.toInt(),
             900, 10, "funk", null, transName = "Motion blur", trans = outFor(292) to 292, kenBurns = false, lookName = "Vivid") { c ->
@@ -129,8 +130,81 @@ object Templates {
             c.filter = fi("Film"); c.fx = 5; c.fxAmount = 0.5f }
     )
 
-    fun byId(id: String) = (ALL + MORE).firstOrNull { it.id == id }
-    val EVERY: List<T> get() = ALL + MORE
+    @Volatile private var remote: List<T> = emptyList()
+    const val REMOTE_URL = "https://raw.githubusercontent.com/meaowsahat-collab/GatsMod-Cut-Android-Starter/main/templates.json"
+
+    fun byId(id: String) = EVERY.firstOrNull { it.id == id }
+    val EVERY: List<T> get() { val r = remote; val ids = r.map { it.id }.toSet(); return (ALL + MORE).filter { it.id !in ids } + r }
+
+    private fun col(s: String, d: Int): Int = try { Color.parseColor(s) } catch (_: Exception) { d }
+
+    private fun parse(text: String): List<T> {
+        val a = org.json.JSONArray(text)
+        val out = ArrayList<T>()
+        for (i in 0 until a.length()) {
+            try {
+                val o = a.getJSONObject(i)
+                val tr = o.optString("trans", "Dissolve")
+                val pair: Pair<Int, Int>? = when (tr) {
+                    "Zoom" -> 1001 to 1; "Slide left" -> 1007 to 8; "Slide up" -> 1009 to 10; "Pop" -> 1002 to 2; "Flash" -> 1005 to 5
+                    "Glitch" -> 1014 to 14; "Spin" -> 1004 to 4; "Motion blur" -> outFor(292) to 292; "Dissolve" -> outFor(299) to 299
+                    else -> null
+                }
+                val music = o.optString("music", "").ifBlank { null }?.takeIf { m -> SoundGen.MUSIC.any { it.id == m } }
+                val fname = o.optString("look", "")
+                val fx = o.optInt("fx", 0); val fa = o.optDouble("fxAmount", 0.5).toFloat()
+                val br = o.optDouble("brightness", 0.0).toFloat(); val co = o.optDouble("contrast", 1.0).toFloat()
+                val sa = o.optDouble("saturation", 1.0).toFloat(); val te = o.optDouble("temp", 0.0).toFloat()
+                out.add(T(o.getString("id"), o.getString("name"), o.optString("cat", "Fun"), o.optString("desc", ""),
+                    col(o.optString("c1"), 0xFF455A64.toInt()), col(o.optString("c2"), 0xFF111111.toInt()),
+                    o.optLong("slotMs", 1800L).coerceIn(500L, 6000L), o.optInt("maxClips", 8).coerceIn(2, 12), music,
+                    o.optString("title", "").ifBlank { null }, col(o.optString("titleColor"), Color.WHITE),
+                    tr, pair, o.optLong("dipMs", if (tr == "Dip to black") 500L else 0L), o.optBoolean("kenBurns", true),
+                    o.optString("lookName", fname.ifBlank { "Custom" }), o.optBoolean("sparkle", false)) { c ->
+                    if (fname.isNotBlank()) c.filter = fi(fname)
+                    c.brightness = br; c.contrast = co; c.saturation = sa; c.temp = te; c.fx = fx; c.fxAmount = fa
+                })
+            } catch (_: Exception) {}
+        }
+        return out
+    }
+
+    /** Template list kept in the app's GitHub repository (templates.json): new templates appear without updating the app. */
+    fun loadRemote(ctx: Context, onChange: () -> Unit) {
+        val f = java.io.File(ctx.filesDir, "templates_remote.json")
+        try { if (f.exists()) remote = parse(f.readText()) } catch (_: Exception) {}
+        Thread {
+            try {
+                if (System.currentTimeMillis() - f.lastModified() < 20 * 60 * 1000L && f.exists()) return@Thread
+                val text = SoundsData.open(REMOTE_URL).inputStream.bufferedReader().use { it.readText() }
+                val list = parse(text)
+                if (list.isNotEmpty()) {
+                    val changed = list.map { it.id + it.name } != remote.map { it.id + it.name }
+                    f.writeText(text); remote = list
+                    if (changed) onChange()
+                }
+            } catch (_: Exception) {}
+        }.also { it.priority = Thread.MIN_PRIORITY }.start()
+    }
+
+    /** A small four-point star with a soft glow, used as a twinkle on top of the edit. */
+    fun sparkleFile(ctx: Context): java.io.File {
+        val f = java.io.File(java.io.File(ctx.filesDir, "tpl").apply { mkdirs() }, "sparkle.png")
+        if (f.exists() && f.length() > 100) return f
+        val S = 192
+        val b = Bitmap.createBitmap(S, S, Bitmap.Config.ARGB_8888)
+        val cv = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val c = S / 2f
+        p.shader = android.graphics.RadialGradient(c, c, c, intArrayOf(0x88FFF3C4.toInt(), 0x00FFF3C4), null, android.graphics.Shader.TileMode.CLAMP)
+        cv.drawCircle(c, c, c, p); p.shader = null
+        val path = android.graphics.Path()
+        val r = c * 0.95f; val k = c * 0.12f
+        path.moveTo(c, c - r); path.quadTo(c + k, c - k, c + r, c); path.quadTo(c + k, c + k, c, c + r)
+        path.quadTo(c - k, c + k, c - r, c); path.quadTo(c - k, c - k, c, c - r); path.close()
+        p.color = Color.WHITE; cv.drawPath(path, p)
+        f.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return f
+    }
 
     /** Puts a photo on a 9:16 picture: the photo fitted in the middle over a blurred, enlarged copy of itself. */
     fun stillFrame(ctx: Context, uri: Uri): Bitmap? {
