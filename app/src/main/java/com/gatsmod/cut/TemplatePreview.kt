@@ -297,7 +297,7 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
         val kb = if (t.kenBurns) 1f else 0f
         val sCur = 1f + 0.14f * kb * (lt / slotD)
         val sPrev = 1f + 0.14f * kb
-        val trD = if (t.trans != null) min(450f, slotD * 0.4f) else if (t.dipMs > 0) 700f else 0f
+        val trD = if (t.trans != null) (if (t.transName == "Dissolve") slotD * 0.55f else min(450f, slotD * 0.4f)) else if (t.dipMs > 0) 700f else 0f
         cv.drawColor(Color.BLACK)
         val q = if (trD > 0f && lt < trD && i > 0 || (trD > 0f && lt < trD && i == 0 && now == lt && false)) lt / trD else 1f
         val inTr = q < 1f
@@ -320,6 +320,16 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
                     cv.restore()
                 }
             }
+            "Motion blur" -> {
+                val e = ease(q); val mv = 1f - abs(2f * q - 1f)
+                for (g in 0..3) {
+                    val a = 0.55f - g * 0.12f; val o = w * 0.09f * g * mv
+                    draw(cv, prev, sPrev, -w * e - o, 0f, 0f, a)
+                    draw(cv, i, sCur, w * (1f - e) + o, 0f, 0f, a)
+                }
+                cv.drawColor(Color.argb((110 * mv).toInt().coerceIn(0, 255), 255, 255, 255))
+            }
+            "Dissolve" -> { draw(cv, prev, sPrev, 0f, 0f, 0f, 1f); draw(cv, i, sCur, 0f, 0f, 0f, ease(q)) }
             "Spin" -> { draw(cv, prev, sPrev * (1f - 0.3f * q), 0f, 0f, 90f * q, 1f - q); draw(cv, i, sCur * (0.7f + 0.3f * q), 0f, 0f, -90f * (1f - q), q) }
             else -> { draw(cv, prev, sPrev, 0f, 0f, 0f, 1f); draw(cv, i, sCur, 0f, 0f, 0f, q) }
         }

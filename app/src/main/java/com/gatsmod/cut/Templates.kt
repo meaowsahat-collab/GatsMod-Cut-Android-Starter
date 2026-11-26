@@ -78,7 +78,22 @@ object Templates {
             c.fx = 8; c.fxAmount = 0.4f; c.brightness = 0.04f; c.saturation = 1.05f }
     )
 
+    /** The Out animation that pairs with an In animation id. */
+    private fun outFor(inId: Int): Int = (Anim.OUT.firstOrNull { it.src == inId } ?: Anim.EXTRA_OUT.firstOrNull { it.src == inId })?.def?.id ?: 1006
+
     val MORE: List<T> = listOf(
+        T("poolside", "Motion Blur Beats", "Music", "Zoom cuts with a streaking blur", 0xFF6D4C41.toInt(), 0xFFFFCC80.toInt(),
+            1100, 10, "pop", null, transName = "Motion blur", trans = outFor(292) to 292, kenBurns = true, lookName = "Warm contrast") { c ->
+            c.filter = fi("Golden"); c.contrast = 1.12f; c.saturation = 1.1f; c.fx = 1; c.fxAmount = 0.35f },
+        T("morph", "Photo Dissolve", "Photo", "Two photos melting into each other", 0xFFFFAB91.toInt(), 0xFF8D6E63.toInt(),
+            1900, 6, "dream", null, transName = "Dissolve", trans = outFor(299) to 299, kenBurns = true, lookName = "Warm peach") { c ->
+            c.filter = fi("Peach"); c.fx = 8; c.fxAmount = 0.3f; c.brightness = 0.02f },
+        T("swipeblur", "Swipe Blur", "Fun", "Fast swipes with blur", 0xFF00ACC1.toInt(), 0xFF7E57C2.toInt(),
+            900, 10, "funk", null, transName = "Motion blur", trans = outFor(292) to 292, kenBurns = false, lookName = "Vivid") { c ->
+            c.filter = fi("Vivid") },
+        T("flashcut", "Zoom Flash Cut", "Cinematic", "Big slow zooms, white flashes", 0xFF455A64.toInt(), 0xFFECEFF1.toInt(),
+            1600, 8, "epic", null, transName = "Flash", trans = 1005 to 5, kenBurns = true, lookName = "Cinema") { c ->
+            c.filter = fi("Cinema"); c.fx = 1; c.fxAmount = 0.4f },
         T("lux", "Luxury Life", "Cinematic", "Teal and orange, slow zooms", 0xFF263238.toInt(), 0xFFFF8F00.toInt(),
             2200, 8, "epic", null, transName = "Zoom", trans = 1001 to 1, kenBurns = true, lookName = "Teal Orange") { c ->
             c.filter = fi("Teal Orange"); c.fx = 1; c.fxAmount = 0.4f },
