@@ -228,6 +228,8 @@ class MainActivity : AppCompatActivity() {
                 if (!project.isEmpty()) engine.seekTo(0)
             }
         } else if (intent.getBooleanExtra("pick", false)) {
+            pendingTool = intent.getStringExtra("autoTool")
+            intent.getStringExtra("audioUri")?.let { pendingAudio = Triple(it, intent.getLongExtra("audioDur", 0L), intent.getStringExtra("audioName") ?: "Music") }
             ui.postDelayed({ pickVideo() }, 250)
         } else if (intent.getBooleanExtra("camera", false)) {
             ui.postDelayed({
@@ -387,6 +389,24 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { u }
     }
 
+    private var pendingTool: String? = null
+    private var pendingAudio: Triple<String, Long, String>? = null
+
+    /** Runs what the Home page asked for (a tool, or a music track) once the first video is in. */
+    private fun runPending() {
+        val a = pendingAudio; val t = pendingTool
+        pendingAudio = null; pendingTool = null
+        if (a != null) addAudioClip(a.first, a.second, a.third)
+        if (t != null) {
+            val c = project.main.firstOrNull { !isEnding(it) } ?: return
+            project.selectedId = c.id
+            syncUi()
+            val all = clipTools(c) + mainTools() + audioTools()
+            val tool = all.firstOrNull { it.name.equals(t, true) }
+            if (tool != null) tool.act() else toast("Select the clip and open $t from the toolbar")
+        }
+    }
+
     private fun loadVideo(src: Uri) {
         toast("Importing video…")
         Thread {
@@ -410,6 +430,7 @@ class MainActivity : AppCompatActivity() {
                 if (first) engine.seekTo(0)
                 syncUi()
                 if (first && Branding.endingOn(this)) ui.postDelayed({ addEnding(true) }, 300)
+                if (first && (pendingTool != null || pendingAudio != null)) ui.postDelayed({ runPending() }, 900)
             }
         }.start()
     }

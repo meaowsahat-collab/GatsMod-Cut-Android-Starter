@@ -23,6 +23,8 @@ object SoundsData {
     fun setPreload(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, 0).edit().putBoolean("preload", on).apply()
     fun jamendoId(ctx: Context) = ctx.getSharedPreferences(PREFS, 0).getString("jamendo_id", "")?.trim() ?: ""
 
+    fun clearCache(ctx: Context) { try { dir(ctx).listFiles()?.forEach { it.deleteRecursively() } } catch (_: Exception) {} }
+
     private fun dir(ctx: Context) = File(ctx.filesDir, "sounds_cache").apply { mkdirs() }
     private fun md5(s: String) = MessageDigest.getInstance("MD5").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 
