@@ -55,13 +55,13 @@ object Samples {
         grad(p, 0f, hz, 0xFF2B1B5A.toInt(), 0xFFB23A7A.toInt(), 0xFFFF8A4C.toInt(), 0xFFFFC56B.toInt())
         cv.drawRect(0f, 0f, W.toFloat(), hz, p)
         val r = Random(3)
-        p.shader = null; p.color = 0x33FFFFFF
+        p.shader = null; p.color = 0x33FFFFFF.toInt()
         for (i in 0 until 6) cv.drawOval(RectF(r.nextInt(W) - 60f, 40f + r.nextInt(180), r.nextInt(W) + 80f, 70f + r.nextInt(190)), p)
         glow(cv, p, W * 0.55f, hz - 10, 150f, 0xAAFFD27A.toInt())
         p.color = 0xFFFFF1B0.toInt(); cv.drawCircle(W * 0.55f, hz - 10, 34f, p)
         grad(p, hz, H.toFloat(), 0xFFF29A5C.toInt(), 0xFF8E3F6B.toInt(), 0xFF1B2250.toInt())
         cv.drawRect(0f, hz, W.toFloat(), H.toFloat(), p); p.shader = null
-        p.color = 0x55FFE3A0
+        p.color = 0x55FFE3A0.toInt()
         for (i in 0 until 14) { val w = 90f - i * 5.5f; cv.drawRect(W * 0.55f - w / 2, hz + 8 + i * 17f, W * 0.55f + w / 2, hz + 13 + i * 17f, p) }
         p.color = 0xFF1A1424.toInt()
         val boat = Path(); boat.moveTo(40f, hz + 6); boat.lineTo(120f, hz + 6); boat.lineTo(104f, hz + 26); boat.lineTo(56f, hz + 26); boat.close(); cv.drawPath(boat, p)
@@ -98,7 +98,7 @@ object Samples {
         val r = Random(5)
         p.color = Color.WHITE
         for (i in 0 until 60) cv.drawCircle(r.nextInt(W).toFloat(), r.nextInt((H * 0.5f).toInt()).toFloat(), 0.8f + r.nextFloat() * 1.2f, p)
-        glow(cv, p, W * 0.72f, H * 0.17f, 90f, 0x66FFF2C8)
+        glow(cv, p, W * 0.72f, H * 0.17f, 90f, 0x66FFF2C8.toInt())
         p.color = 0xFFFFF6DA.toInt(); cv.drawCircle(W * 0.72f, H * 0.17f, 28f, p)
         var x = -10f
         while (x < W) {
@@ -117,7 +117,7 @@ object Samples {
         cv.drawRect(0f, 0f, W.toFloat(), H.toFloat(), p); p.shader = null
         glow(cv, p, W * 0.2f, H * 0.12f, 140f, 0xCCFFF8C8.toInt())
         val r = Random(11)
-        p.color = 0x88FFFFFF
+        p.color = 0x88FFFFFF.toInt()
         for (i in 0 until 5) cv.drawOval(RectF(r.nextInt(W) - 40f, 60f + r.nextInt(160), r.nextInt(W) + 90f, 100f + r.nextInt(170)), p)
         grad(p, H * 0.42f, H.toFloat(), 0xFF9AD66B.toInt(), 0xFF2F8F3F.toInt())
         val hill = Path(); hill.moveTo(0f, H * 0.5f); hill.quadTo(W * 0.5f, H * 0.38f, W.toFloat(), H * 0.52f); hill.lineTo(W.toFloat(), H.toFloat()); hill.lineTo(0f, H.toFloat()); hill.close()
@@ -248,14 +248,14 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
                 paint.colorFilter = null; paint.alpha = 255; paint.shader = vig; cv.drawRect(0f, 0f, w, h, paint); paint.shader = null
             }
             4 -> {
-                paint.colorFilter = null; paint.color = 0x26000000
+                paint.colorFilter = null; paint.color = 0x26000000.toInt()
                 var y = 0f; while (y < h) { cv.drawRect(0f, y, w, y + 1.5f, paint); y += 5f }
                 rnd.setSeed(SystemClock.uptimeMillis() / 120)
-                paint.color = 0x33FF3060; cv.drawRect(0f, rnd.nextFloat() * h, w, rnd.nextFloat() * 12f + 4f + 0f, paint)
+                paint.color = 0x33FF3060.toInt(); cv.drawRect(0f, rnd.nextFloat() * h, w, rnd.nextFloat() * 12f + 4f + 0f, paint)
             }
             5 -> {
                 paint.colorFilter = null; rnd.setSeed(SystemClock.uptimeMillis() / 60)
-                for (k in 0 until 140) { paint.color = if (k % 2 == 0) 0x33FFFFFF else 0x33000000; cv.drawCircle(rnd.nextFloat() * w, rnd.nextFloat() * h, 1.2f, paint) }
+                for (k in 0 until 140) { paint.color = if (k % 2 == 0) 0x33FFFFFF.toInt() else 0x33000000; cv.drawCircle(rnd.nextFloat() * w, rnd.nextFloat() * h, 1.2f, paint) }
             }
             8 -> {
                 paint.colorFilter = null; paint.alpha = 255
