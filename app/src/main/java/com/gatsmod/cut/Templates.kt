@@ -134,7 +134,8 @@ object Templates {
     const val REMOTE_URL = "https://raw.githubusercontent.com/meaowsahat-collab/GatsMod-Cut-Android-Starter/main/templates.json"
 
     fun byId(id: String) = EVERY.firstOrNull { it.id == id }
-    val EVERY: List<T> get() { val r = remote; val ids = r.map { it.id }.toSet(); return (ALL + MORE).filter { it.id !in ids } + r }
+    val EVERY: List<T> get() { val r = remote; val ids = r.map { it.id }.toSet(); return r + (ALL + MORE).filter { it.id !in ids } }
+    fun isOnline(t: T) = remote.any { it.id == t.id }
 
     private fun col(s: String, d: Int): Int = try { Color.parseColor(s) } catch (_: Exception) { d }
 

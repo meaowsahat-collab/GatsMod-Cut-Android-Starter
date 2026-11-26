@@ -609,6 +609,12 @@ class HomeActivity : AppCompatActivity() {
                 cell.setOnClickListener { templatePage(t) }
                 val cover = FrameLayout(this)
                 cover.addView(TemplatePreview(this, t), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                if (Templates.isOnline(t)) {
+                    val nb = TextView(this)
+                    nb.text = "NEW"; nb.textSize = 10f; nb.setTypeface(null, Typeface.BOLD); nb.setTextColor(0xFF06222A.toInt()); nb.setPadding(dp(7), dp(2), dp(7), dp(2))
+                    val nbg = GradientDrawable(); nbg.cornerRadius = dp(8).toFloat(); nbg.setColor(0xFF00D1E8.toInt()); nb.background = nbg
+                    cover.addView(nb, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START).also { it.setMargins(dp(8), dp(8), 0, 0) })
+                }
                 val info = TextView(this)
                 info.text = "⏱ " + fmt(t.totalMs) + "   ▣ " + t.maxClips
                 info.textSize = 12f; info.setTextColor(Color.WHITE); info.setTypeface(null, Typeface.BOLD)
