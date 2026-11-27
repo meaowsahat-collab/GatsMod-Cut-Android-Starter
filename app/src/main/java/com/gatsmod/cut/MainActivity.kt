@@ -3,6 +3,9 @@ package com.gatsmod.cut
 import android.app.Dialog
 import android.content.Intent
 import android.graphics.Color
+import android.view.MotionEvent
+import android.graphics.Shader
+import android.graphics.LinearGradient
 import android.graphics.Path
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -2644,26 +2647,98 @@ class MainActivity : AppCompatActivity() {
         b.setColorFilter(if (on) 0xFF00D1E8.toInt() else Color.WHITE)
     }
 
-    private class CurveView(ctx: android.content.Context, private val id: Int, private val sel: Boolean) : View(ctx) {
+    private class CurveView(ctx: android.content.Context, var id: Int, var sel: Boolean, val big: Boolean = false) : View(ctx) {
+        private fun dp(v: Float) = v * resources.displayMetrics.density
         private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        var ball = -1f
+        private val anim = android.animation.ValueAnimator.ofFloat(0f, 1.25f).apply {
+            duration = 2000; repeatCount = android.animation.ValueAnimator.INFINITE
+            addUpdateListener { ball = (it.animatedValue as Float).coerceAtMost(1f); invalidate() }
+        }
+        fun animate(on: Boolean) { if (on && !anim.isStarted) anim.start() else if (!on) { anim.cancel(); ball = -1f } }
+        override fun onDetachedFromWindow() { anim.cancel(); super.onDetachedFromWindow() }
+
         override fun onDraw(cv: Canvas) {
-            val w = width.toFloat(); val h = height.toFloat(); val m = w * 0.18f
-            val bg = GradientDrawable(); bg.cornerRadius = w * 0.16f; bg.setColor(0xFF2E2E38.toInt())
-            if (sel) bg.setStroke((w * 0.045f).toInt().coerceAtLeast(2), Color.WHITE)
+            val w = width.toFloat(); val h = height.toFloat()
+            val r = if (big) dp(14f) else w * 0.18f
+            val bg = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0xFF2B2B3A.toInt(), 0xFF1B1B26.toInt()))
+            bg.cornerRadius = r
+            if (sel) bg.setStroke(dp(if (big) 1.5f else 2f).toInt(), 0xFF00D1E8.toInt())
             bg.setBounds(0, 0, width, height); bg.draw(cv)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f; p.color = 0x44FFFFFF
-            p.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 6f), 0f)
-            val y0 = h - m * 1.4f; val y1 = m * 1.4f
-            cv.drawLine(m, y0, w - m, y0, p); cv.drawLine(m, y1, w - m, y1, p)
-            p.pathEffect = null; p.strokeWidth = w * 0.035f; p.strokeCap = Paint.Cap.ROUND; p.color = if (sel) Color.WHITE else 0xFFD0D0D8.toInt()
+            val gx0: Float; val gx1: Float
+            if (big) { gx0 = h * 0.2f; gx1 = h * 1.15f } else { gx0 = w * 0.2f; gx1 = w * 0.8f }
+            val gy0 = h * 0.8f; val gy1 = h * 0.2f
+            p.style = Paint.Style.STROKE; p.strokeWidth = dp(1f); p.color = 0x33FFFFFF
+            p.pathEffect = android.graphics.DashPathEffect(floatArrayOf(dp(3f), dp(3f)), 0f)
+            cv.drawLine(gx0, gy0, gx1, gy0, p); cv.drawLine(gx0, gy1, gx1, gy1, p)
+            p.pathEffect = null
             val path = Path()
-            for (i in 0..40) {
-                val t = i / 40f
-                val v = Easing.apply(id, t).coerceIn(-0.35f, 1.35f)
-                val x = m + (w - 2 * m) * t; val y = y0 + (y1 - y0) * v
+            for (i in 0..48) {
+                val t = i / 48f
+                val v = Easing.apply(id, t).coerceIn(-0.4f, 1.4f)
+                val x = gx0 + (gx1 - gx0) * t; val y = gy0 + (gy1 - gy0) * v
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
-            cv.drawPath(path, p)
+            p.strokeCap = Paint.Cap.ROUND; p.strokeJoin = Paint.Join.ROUND
+            val sh = LinearGradient(gx0, 0f, gx1, 0f, if (sel) intArrayOf(0xFF00D1E8.toInt(), 0xFFB36BFF.toInt()) else intArrayOf(0xFF9FA3B5.toInt(), 0xFFD7D9E6.toInt()), null, Shader.TileMode.CLAMP)
+            if (sel) { p.shader = sh; p.strokeWidth = dp(if (big) 9f else 6f); p.alpha = 55; cv.drawPath(path, p) }
+            p.shader = sh; p.alpha = 255; p.strokeWidth = dp(if (big) 3f else 2.2f); cv.drawPath(path, p); p.shader = null
+            if (ball >= 0f) {
+                val v = Easing.apply(id, ball)
+                val bx = gx0 + (gx1 - gx0) * ball; val by = gy0 + (gy1 - gy0) * v.coerceIn(-0.4f, 1.4f)
+                p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt(); cv.drawCircle(bx, by, dp(if (big) 5f else 3.5f), p)
+                if (big) {
+                    val tx0 = h * 1.45f; val tx1 = w - dp(18f); val ty = h * 0.5f
+                    p.style = Paint.Style.STROKE; p.strokeWidth = dp(3f); p.color = 0x33FFFFFF; cv.drawLine(tx0, ty, tx1, ty, p)
+                    p.style = Paint.Style.FILL; p.color = 0xFF00D1E8.toInt()
+                    cv.drawCircle(tx0 + (tx1 - tx0) * v.coerceIn(-0.2f, 1.2f), ty, dp(9f), p)
+                }
+            }
+        }
+    }
+
+    /** Drag the two handles to draw your own speed curve. */
+    private class BezierEditor(ctx: android.content.Context, start: FloatArray, val onChange: (FloatArray) -> Unit) : View(ctx) {
+        private fun dp(v: Float) = v * resources.displayMetrics.density
+        var b = start.copyOf()
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var drag = -1
+        private fun gx(x: Float) = width * 0.12f + width * 0.76f * x
+        private fun gy(y: Float) = height * 0.78f - height * 0.56f * y
+        override fun onDraw(cv: Canvas) {
+            val bg = GradientDrawable(); bg.cornerRadius = dp(14f); bg.setColor(0xFF1B1B26.toInt()); bg.setBounds(0, 0, width, height); bg.draw(cv)
+            p.style = Paint.Style.STROKE; p.strokeWidth = dp(1f); p.color = 0x33FFFFFF
+            cv.drawLine(gx(0f), gy(0f), gx(1f), gy(0f), p); cv.drawLine(gx(0f), gy(1f), gx(1f), gy(1f), p)
+            cv.drawLine(gx(0f), gy(0f), gx(0f), gy(1f), p); cv.drawLine(gx(1f), gy(0f), gx(1f), gy(1f), p)
+            p.color = 0x88B36BFF.toInt(); p.strokeWidth = dp(1.5f)
+            cv.drawLine(gx(0f), gy(0f), gx(b[0]), gy(b[1]), p); cv.drawLine(gx(1f), gy(1f), gx(b[2]), gy(b[3]), p)
+            val path = Path()
+            for (i in 0..60) {
+                val t = i / 60f
+                val v = Easing.apply(Easing.pack(b[0], b[1], b[2], b[3]), t)
+                val x = gx(t); val y = gy(v.coerceIn(-0.6f, 1.6f))
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            p.shader = LinearGradient(gx(0f), 0f, gx(1f), 0f, 0xFF00D1E8.toInt(), 0xFFB36BFF.toInt(), Shader.TileMode.CLAMP)
+            p.strokeWidth = dp(3.2f); p.strokeCap = Paint.Cap.ROUND; cv.drawPath(path, p); p.shader = null
+            p.style = Paint.Style.FILL
+            for (k in 0..1) { p.color = if (k == 0) 0xFF00D1E8.toInt() else 0xFFB36BFF.toInt(); cv.drawCircle(gx(b[k * 2]), gy(b[k * 2 + 1]), dp(11f), p); p.color = Color.WHITE; cv.drawCircle(gx(b[k * 2]), gy(b[k * 2 + 1]), dp(4f), p) }
+        }
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    val d0 = Math.hypot((e.x - gx(b[0])).toDouble(), (e.y - gy(b[1])).toDouble()); val d1 = Math.hypot((e.x - gx(b[2])).toDouble(), (e.y - gy(b[3])).toDouble())
+                    drag = if (min(d0, d1) < dp(40f)) (if (d0 <= d1) 0 else 1) else -1
+                }
+                MotionEvent.ACTION_MOVE -> if (drag >= 0) {
+                    b[drag * 2] = ((e.x - width * 0.12f) / (width * 0.76f)).coerceIn(0f, 1f)
+                    b[drag * 2 + 1] = ((height * 0.78f - e.y) / (height * 0.56f)).coerceIn(-1f, 2f)
+                    invalidate(); onChange(b)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> drag = -1
+            }
+            return true
         }
     }
 
@@ -2676,29 +2751,65 @@ class MainActivity : AppCompatActivity() {
         val local = (engine.playheadMs - c.startMs).coerceAtLeast(0L)
         val kf = sorted.lastOrNull { it.tMs <= local + 60 } ?: sorted.first()
         if (kf === sorted.last()) { toast("Move the playhead onto a keyframe that has another keyframe after it."); return }
-        val scroll = HorizontalScrollView(this)
-        scroll.isHorizontalScrollBarEnabled = false
-        val row = LinearLayout(this)
-        scroll.addView(row)
-        val curves = ArrayList<Pair<Int, View>>()
-        fun mark() {
-            row.removeAllViews()
-            curves.clear()
-            Easing.NAMES.forEachIndexed { id, name ->
-                val col = LinearLayout(this)
-                col.orientation = LinearLayout.VERTICAL
-                col.gravity = Gravity.CENTER_HORIZONTAL
-                col.setPadding(dp(4), dp(4), dp(4), dp(4))
-                col.addView(CurveView(this, id, kf.ease == id || (kf.ease == 0 && id == 0)), LinearLayout.LayoutParams(dp(66), dp(66)))
-                val t = TextView(this)
-                t.text = name; t.textSize = 11f; t.setTextColor(if (kf.ease == id) Color.WHITE else 0xFFA0A0AA.toInt()); t.gravity = Gravity.CENTER; t.setPadding(0, dp(4), 0, 0)
-                col.addView(t, LinearLayout.LayoutParams(dp(70), ViewGroup.LayoutParams.WRAP_CONTENT))
-                col.setOnClickListener { kf.ease = id; mark(); live(); toast(name) }
-                row.addView(col)
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        val big = CurveView(this, kf.ease, true, true)
+        big.animate(true)
+        box.addView(big, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(112)))
+        val nameLine = TextView(this)
+        nameLine.setTextColor(Color.WHITE); nameLine.textSize = 14f; nameLine.setTypeface(null, Typeface.BOLD); nameLine.setPadding(dp(2), dp(8), 0, dp(6))
+        fun nameOf(id: Int) = if (Easing.isCustom(id)) "Custom curve" else Easing.NAMES.getOrElse(id) { "Linear" }
+        nameLine.text = nameOf(kf.ease)
+        box.addView(nameLine)
+        val chipRow = LinearLayout(this)
+        val chipScroll = HorizontalScrollView(this); chipScroll.isHorizontalScrollBarEnabled = false; chipScroll.addView(chipRow)
+        box.addView(chipScroll)
+        val body = FrameLayout(this)
+        box.addView(body, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(118)).also { it.setMargins(0, dp(8), 0, 0) })
+        val cats = Easing.CATEGORIES.map { it.first } + "Custom"
+        var catIdx = if (Easing.isCustom(kf.ease)) cats.size - 1 else 0
+        val chips = ArrayList<TextView>()
+        fun pick(id: Int) { kf.ease = id; big.id = id; big.invalidate(); nameLine.text = nameOf(id); live() }
+        fun showCat() {
+            chips.forEachIndexed { k, t ->
+                val g = GradientDrawable(); g.cornerRadius = dp(16).toFloat()
+                if (k == catIdx) g.setColor(0xFF00D1E8.toInt()) else { g.setColor(0xFF2A2A34.toInt()) }
+                t.background = g; t.setTextColor(if (k == catIdx) 0xFF06222A.toInt() else 0xFFC9CBD6.toInt())
             }
+            body.removeAllViews()
+            if (catIdx == cats.size - 1) {
+                val start = if (Easing.isCustom(kf.ease)) Easing.unpack(kf.ease) else floatArrayOf(0.4f, 0f, 0.2f, 1f)
+                val ed = BezierEditor(this, start) { b -> pick(Easing.pack(b[0], b[1], b[2], b[3])) }
+                body.addView(ed, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                val hint = TextView(this); hint.text = "Drag the two dots"; hint.textSize = 11f; hint.setTextColor(0xFF8E90A0.toInt())
+                body.addView(hint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END).also { it.setMargins(0, dp(6), dp(10), 0) })
+                return
+            }
+            val sc = HorizontalScrollView(this); sc.isHorizontalScrollBarEnabled = false
+            val row = LinearLayout(this); sc.addView(row)
+            val tiles = ArrayList<Pair<Int, CurveView>>()
+            for (id in Easing.CATEGORIES[catIdx].second) {
+                val col = LinearLayout(this)
+                col.orientation = LinearLayout.VERTICAL; col.gravity = Gravity.CENTER_HORIZONTAL; col.setPadding(dp(4), 0, dp(4), 0)
+                val cv = CurveView(this, id, kf.ease == id)
+                col.addView(cv, LinearLayout.LayoutParams(dp(70), dp(70)))
+                val t = TextView(this); t.text = Easing.NAMES[id]; t.textSize = 11f; t.gravity = Gravity.CENTER; t.setTextColor(0xFFC9CBD6.toInt()); t.maxLines = 1; t.setPadding(0, dp(5), 0, 0)
+                col.addView(t, LinearLayout.LayoutParams(dp(74), ViewGroup.LayoutParams.WRAP_CONTENT))
+                col.setOnClickListener { pick(id); tiles.forEach { (tid, v) -> v.sel = tid == id; v.animate(tid == id); v.invalidate() } }
+                row.addView(col); tiles.add(id to cv)
+            }
+            body.addView(sc, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
-        mark()
-        lookSheet("Graphs", c, scroll, label("Shapes the speed of the movement from this keyframe to the next one."))
+        cats.forEachIndexed { k, name ->
+            val t = TextView(this); t.text = name; t.textSize = 13f; t.setTypeface(null, Typeface.BOLD); t.setPadding(dp(14), dp(6), dp(14), dp(6))
+            t.setOnClickListener { catIdx = k; showCat() }
+            chipRow.addView(t, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also { it.setMargins(0, 0, dp(8), 0) })
+            chips.add(t)
+        }
+        showCat()
+        lookSheet("Graphs", c, box,
+            button("Apply to all keyframes") { val e = kf.ease; c.keyframes.forEach { if (it !== sorted.last()) it.ease = e }; live(); toast("Applied to all keyframes") },
+            label("Shapes the speed of the movement from this keyframe to the next one."))
     }
 
     private fun keyframeDialog() {
