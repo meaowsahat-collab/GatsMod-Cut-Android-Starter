@@ -296,7 +296,7 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
                 val ky = r.centerY()
                 val d = dp(7f)
                 val path = Path().apply { moveTo(kx, ky - d); lineTo(kx + d, ky); lineTo(kx, ky + d); lineTo(kx - d, ky); close() }
-                kfPaint.color = if (abs(kx - width / 2f) < dp(9f)) 0xFFFF3B4F.toInt() else Color.WHITE
+                kfPaint.color = if (abs(kx - width / 2f) < dp(9f)) 0xFFFF3B4F.toInt() else 0xFFFFFFFF.toInt()
                 canvas.drawPath(path, kfPaint)
             }
         }
