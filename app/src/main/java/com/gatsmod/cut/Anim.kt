@@ -377,6 +377,10 @@ object Anim {
     fun poseOf(c: Clip, tMs: Long): Pose {
         var p = pose(c.animIn, c.animInMs, c.animOut, c.animOutMs, c.animCombo, tMs, c.lengthMs)
         if (c.textMotion != 0) p *= ProText.pose(c.textMotion, tMs)
+        if (c.kind != LaneKind.VIDEO && c.keyframes.isNotEmpty()) {
+            val k = Keyframes.valueAt(c.keyframes, tMs.coerceIn(0L, c.lengthMs))
+            p *= Pose(k.scale, k.scale, k.x, k.y, k.rot, 1f)
+        }
         return p
     }
 

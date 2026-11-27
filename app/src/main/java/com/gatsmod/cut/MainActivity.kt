@@ -120,8 +120,25 @@ class MainActivity : AppCompatActivity() {
 
         timeline.project = project
         overlayView.project = project
-        overlayView.onDragStart = { project.checkpoint() }
-        overlayView.onDragEnd = { timeline.invalidate() }
+        overlayView.onDragStart = {
+            project.checkpoint()
+            dragSnap = project.selected()?.let { floatArrayOf(it.posX, it.posY, it.sizeFrac, it.tilt) }
+        }
+        overlayView.onDragEnd = {
+            // With keyframes, moving / resizing / turning a text or sticker records a keyframe at the playhead.
+            val c = project.selected(); val sn = dragSnap; dragSnap = null
+            if (c != null && sn != null && (c.kind == LaneKind.TEXT || c.kind == LaneKind.OVERLAY) && c.keyframes.any { it.key }) {
+                val local = (engine.playheadMs - c.startMs).coerceIn(0L, c.lengthMs)
+                val cur = Keyframes.valueAt(c.keyframes, local)
+                val k = Keyframe(local, (cur.scale * c.sizeFrac / max(0.0001f, sn[2])).coerceIn(0.1f, 8f),
+                    cur.x + (c.posX - sn[0]) * 2f, cur.y - (c.posY - sn[1]) * 2f, cur.rot + (c.tilt - sn[3]), 0, true)
+                c.posX = sn[0]; c.posY = sn[1]; c.sizeFrac = sn[2]; c.tilt = sn[3]
+                project.setKeyframe(c, k)
+                overlayView.invalidate()
+            }
+            timeline.invalidate()
+            refreshKeyframeButton()
+        }
         overlayView.onDelete = { engine.pause(); result(project.delete()) }
         var gScale = 1f; var gDx = 0f; var gDy = 0f; var gRot = 0f
         overlayView.onVideoGestureStart = {
@@ -368,6 +385,16 @@ class MainActivity : AppCompatActivity() {
         project.clampToTimeline()
         engine.refresh()
         syncUi()
+    }
+
+    private var dragSnap: FloatArray? = null
+
+    /** Clip that keyframes apply to: the selected text or sticker, otherwise the video clip under the playhead. */
+    private fun kfTarget(): Clip? {
+        val s = project.selected()
+        if (s != null && (s.kind == LaneKind.TEXT || s.kind == LaneKind.OVERLAY)) { engine.pause(); return s }
+        if (s != null && s.kind == LaneKind.AUDIO) { toast("Select a video clip, text or sticker first"); return null }
+        return need(true)
     }
 
     private fun need(video: Boolean = false): Clip? {
@@ -982,6 +1009,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Slider changes while dragging: update about 4 times a second (not only after the finger lifts). */
     private fun live() {
+        overlayView.invalidate()
         gradeClip?.let { applyGrade(it) }
         ui.removeCallbacks(liveRun)
         val wait = (if (gradeClip != null) 50L else 150L) - (android.os.SystemClock.uptimeMillis() - liveLast)
@@ -2623,7 +2651,7 @@ class MainActivity : AppCompatActivity() {
 
     /** The diamond button: adds a keyframe at the playhead, or removes the one that is there (like CapCut). */
     private fun toggleKeyframe() {
-        val c = need(true) ?: return
+        val c = kfTarget() ?: return
         engine.pause()
         val local = (engine.playheadMs - c.startMs).coerceIn(0L, c.lengthMs)
         project.checkpoint()
@@ -2641,7 +2669,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshKeyframeButton() {
         val c = project.selected()
-        val on = c != null && c.kind == LaneKind.VIDEO && c.keyframes.any { abs(it.tMs - (engine.playheadMs - c.startMs)) < 60 && (it.key || c.keyframes.size > 1) }
+        val on = c != null && c.kind != LaneKind.AUDIO && c.keyframes.any { abs(it.tMs - (engine.playheadMs - c.startMs)) < 60 && (it.key || c.keyframes.size > 1) }
         val b = findViewById<ImageButton>(R.id.keyframeButton) ?: return
         b.setImageResource(if (on) R.drawable.ic_keyframe_fill else R.drawable.ic_keyframe)
         b.setColorFilter(if (on) 0xFF00D1E8.toInt() else Color.WHITE)
@@ -2744,7 +2772,7 @@ class MainActivity : AppCompatActivity() {
 
     /** The curve button: choose how fast the picture moves from the keyframe at the playhead to the next one. */
     private fun graphDialog() {
-        val c = need(true) ?: return
+        val c = kfTarget() ?: return
         engine.pause()
         val sorted = c.keyframes.sortedBy { it.tMs }
         if (sorted.size < 2) { toast("Graphs shape the movement between two keyframes. Tap the diamond to add keyframes first."); return }
@@ -2813,7 +2841,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun keyframeDialog() {
-        val c = need(true) ?: return
+        val c = kfTarget() ?: return
         val local = (engine.playheadMs - c.startMs).coerceIn(0L, c.lengthMs)
         val cur = if (c.keyframes.isEmpty()) Keyframe(local) else Keyframes.valueAt(c.keyframes, local)
         var scale = cur.scale; var x = cur.x; var y = cur.y; var rot = cur.rot

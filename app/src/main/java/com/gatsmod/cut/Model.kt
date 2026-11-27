@@ -103,7 +103,7 @@ data class Clip(
     var vignette: Float = 0f,
     var grain: Float = 0f
 ) {
-    val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0 || textMotion != 0
+    val hasAnim: Boolean get() = animIn != 0 || animOut != 0 || animCombo != 0 || textMotion != 0 || (kind != LaneKind.VIDEO && keyframes.isNotEmpty())
     val isMedia: Boolean get() = kind == LaneKind.VIDEO || kind == LaneKind.AUDIO
     val lengthMs: Long
         get() = if (isMedia) max(1L, ((srcOutMs - srcInMs) / speed).toLong()) else durMs

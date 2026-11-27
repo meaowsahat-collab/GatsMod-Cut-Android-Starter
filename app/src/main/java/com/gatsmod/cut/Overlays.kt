@@ -314,6 +314,16 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
         return RectF(cx - b.width / 2f, cy - b.height / 2f, cx + b.width / 2f, cy + b.height / 2f)
     }
 
+    /** Where the selection box really is: the base box moved and scaled by the keyframes at the playhead. */
+    private fun hitBounds(c: Clip, r: RectF): RectF? {
+        val b = boundsOf(c, r) ?: return null
+        if (c.keyframes.isEmpty()) return b
+        val k = Keyframes.valueAt(c.keyframes, (playheadMs - c.startMs).coerceIn(0L, c.lengthMs))
+        val cx = b.centerX() + k.x / 2f * r.width(); val cy = b.centerY() - k.y / 2f * r.height()
+        val hw = b.width() / 2f * k.scale; val hh = b.height() / 2f * k.scale
+        return RectF(cx - hw, cy - hh, cx + hw, cy + hh)
+    }
+
     private val dens = context.resources.displayMetrics.density
     private val handleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val handleText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF222222.toInt(); textAlign = Paint.Align.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD }
@@ -341,10 +351,11 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
             canvas.drawBitmap(b, bounds.left, bounds.top, pp)
             canvas.restore()
             if (c.id == sel) {
-                canvas.drawRoundRect(bounds, 8f, 8f, box)
+                val hb = hitBounds(c, r) ?: bounds
+                canvas.drawRoundRect(hb, 8f, 8f, box)
                 val hr = handleR()
                 handleText.textSize = hr * 1.2f
-                val d = deleteHandle(bounds); val z = resizeHandle(bounds)
+                val d = deleteHandle(hb); val z = resizeHandle(hb)
                 canvas.drawCircle(d[0], d[1], hr, handleFill)
                 canvas.drawText("✕", d[0], d[1] + hr * 0.42f, handleText)
                 canvas.drawCircle(z[0], z[1], hr, handleFill)
@@ -456,7 +467,7 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
                 val s = p.selected() ?: return false
                 if (s.kind != LaneKind.TEXT && s.kind != LaneKind.OVERLAY) return false
                 if (s !in active()) return false
-                val b = boundsOf(s, r) ?: return false
+                val b = hitBounds(s, r) ?: return false
                 val hr = handleR() * 1.8f
                 val d = deleteHandle(b); val z = resizeHandle(b)
                 if (Math.hypot((e.x - d[0]).toDouble(), (e.y - d[1]).toDouble()) < hr) { mode = 3; dragId = s.id; return true }
@@ -486,8 +497,9 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
                 val minSize = if (c.kind == LaneKind.TEXT) 0.02f else 0.05f
                 when (mode) {
                     1 -> {
-                        c.posX = min(1f, max(0f, (e.x - r.left) / r.width()))
-                        c.posY = min(1f, max(0f, (e.y - r.top) / r.height()))
+                        val ko = if (c.keyframes.isEmpty()) null else Keyframes.valueAt(c.keyframes, (playheadMs - c.startMs).coerceIn(0L, c.lengthMs))
+                        c.posX = min(1f, max(0f, (e.x - r.left) / r.width() - (ko?.x ?: 0f) / 2f))
+                        c.posY = min(1f, max(0f, (e.y - r.top) / r.height() + (ko?.y ?: 0f) / 2f))
                     }
                     2 -> {
                         val dd = Math.hypot((e.x - cx0).toDouble(), (e.y - cy0).toDouble()).toFloat().coerceAtLeast(1f)
@@ -510,7 +522,7 @@ class OverlayView(context: Context, attrs: AttributeSet? = null) : View(context,
                 if (was != -1L) {
                     if (m == 3 && e.actionMasked == MotionEvent.ACTION_UP) {
                         val c = p.byId(was)
-                        val b = c?.let { boundsOf(it, r) }
+                        val b = c?.let { hitBounds(it, r) }
                         val d = b?.let { deleteHandle(it) }
                         if (d != null && Math.hypot((e.x - d[0]).toDouble(), (e.y - d[1]).toDouble()) < handleR() * 1.8f) onDelete?.invoke()
                     } else onDragEnd?.invoke()
