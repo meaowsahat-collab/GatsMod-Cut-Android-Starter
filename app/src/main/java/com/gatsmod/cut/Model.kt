@@ -8,7 +8,7 @@ import kotlin.math.min
 enum class LaneKind { VIDEO, AUDIO, TEXT, OVERLAY }
 
 /** Transform keyframe. [tMs] is relative to the start of the clip on the timeline. */
-data class Keyframe(var tMs: Long, var scale: Float = 1f, var x: Float = 0f, var y: Float = 0f, var rot: Float = 0f)
+data class Keyframe(var tMs: Long, var scale: Float = 1f, var x: Float = 0f, var y: Float = 0f, var rot: Float = 0f, var ease: Int = 0, var key: Boolean = false)
 
 data class Chroma(
     var enabled: Boolean = false,
@@ -116,7 +116,7 @@ data class Clip(
     fun paramSig(): String =
         "$filter|$brightness|$contrast|$saturation|$blur|$cropRatio|$speed|$volume|$rotation|$flipH|$flipV|$temp|$hue|$lum|$fadeInMs|$fadeOutMs|$fx|$fxAmount|$maskShape|$maskSize|$maskFeather|$maskInvert|$maskX|$maskY|$denoise|${stab.hashCode()}|$animIn|$animInMs|$animOut|$animOutMs|$animCombo|$textMotion|$exposure|$tint|$highlights|$shadows|$vibrance|$fade|$sharpen|$vignette|$grain|" +
             "${chroma.enabled}|${chroma.key}|${chroma.similarity}|${chroma.smooth}|${chroma.bg}|" +
-            keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }
+            keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}:${it.ease}" }
 }
 
 /** Fade in / fade out gain (0..1) at [tMs] inside a clip that is [lenMs] long. */
@@ -139,7 +139,7 @@ object Keyframes {
             val a = s[i]
             val b = s[i + 1]
             if (tMs in a.tMs..b.tMs) {
-                val f = if (b.tMs == a.tMs) 0f else (tMs - a.tMs).toFloat() / (b.tMs - a.tMs)
+                val f = Easing.apply(a.ease, if (b.tMs == a.tMs) 0f else (tMs - a.tMs).toFloat() / (b.tMs - a.tMs))
                 fun l(x: Float, y: Float) = x + (y - x) * f
                 return Keyframe(tMs, l(a.scale, b.scale), l(a.x, b.x), l(a.y, b.y), l(a.rot, b.rot))
             }
@@ -434,6 +434,7 @@ class Project {
     // ---------------- keyframes ----------------
 
     fun setKeyframe(c: Clip, k: Keyframe) {
+        c.keyframes.firstOrNull { abs(it.tMs - k.tMs) < 60 }?.let { if (k.ease == 0) k.ease = it.ease }
         c.keyframes.removeAll { abs(it.tMs - k.tMs) < 60 }
         c.keyframes.add(k)
         c.keyframes.sortBy { it.tMs }

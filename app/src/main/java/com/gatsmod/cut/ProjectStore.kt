@@ -96,7 +96,7 @@ object ProjectStore {
         o.put("chromaOn", c.chroma.enabled); o.put("chromaKey", c.chroma.key); o.put("chromaSim", c.chroma.similarity.toDouble())
         o.put("chromaSmooth", c.chroma.smooth.toDouble()); o.put("chromaBg", c.chroma.bg)
         o.put("keyframes", JSONArray(c.keyframes.map {
-            JSONObject().put("t", it.tMs).put("s", it.scale.toDouble()).put("x", it.x.toDouble()).put("y", it.y.toDouble()).put("r", it.rot.toDouble())
+            JSONObject().put("t", it.tMs).put("s", it.scale.toDouble()).put("x", it.x.toDouble()).put("y", it.y.toDouble()).put("r", it.rot.toDouble()).put("e", it.ease).put("k", it.key)
         }))
         o.put("width", c.width); o.put("height", c.height); o.put("hasAudio", c.hasAudio); o.put("fps", c.fps.toDouble())
         o.put("text", c.text); o.put("color", c.color); o.put("sizeFrac", c.sizeFrac.toDouble())
@@ -120,7 +120,7 @@ object ProjectStore {
             o.optJSONArray("keyframes")?.let { k ->
                 for (j in 0 until k.length()) {
                     val q = k.getJSONObject(j)
-                    kf.add(Keyframe(q.optLong("t"), q.optDouble("s", 1.0).toFloat(), q.optDouble("x").toFloat(), q.optDouble("y").toFloat(), q.optDouble("r").toFloat()))
+                    kf.add(Keyframe(q.optLong("t"), q.optDouble("s", 1.0).toFloat(), q.optDouble("x").toFloat(), q.optDouble("y").toFloat(), q.optDouble("r").toFloat(), q.optInt("e", 0), q.optBoolean("k", false)))
                 }
             }
             l.add(

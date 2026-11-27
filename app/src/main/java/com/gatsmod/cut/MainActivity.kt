@@ -3,6 +3,8 @@ package com.gatsmod.cut
 import android.app.Dialog
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Path
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -138,14 +140,16 @@ class MainActivity : AppCompatActivity() {
                 val rc = overlayView.canvasRect()
                 val local = (engine.playheadMs - c.startMs).coerceAtLeast(0L)
                 val cur = if (c.keyframes.isEmpty()) Keyframe(0) else Keyframes.valueAt(c.keyframes, local)
+                // CapCut behaviour: once the clip has keyframes, moving the picture records a keyframe at the playhead by itself.
+                val animated = c.keyframes.any { it.key } || c.keyframes.size > 1
                 val k = Keyframe(
-                    if (c.keyframes.size <= 1) 0L else local,
+                    if (animated) local else 0L,
                     (cur.scale * gScale).coerceIn(0.1f, 8f),
                     cur.x + 2f * gDx / max(1f, rc.width()),
                     cur.y - 2f * gDy / max(1f, rc.height()),
-                    cur.rot + gRot
+                    cur.rot + gRot, 0, animated
                 )
-                if (c.keyframes.size <= 1) c.keyframes = mutableListOf(k) else project.setKeyframe(c, k)
+                if (!animated) c.keyframes = mutableListOf(k) else project.setKeyframe(c, k)
                 live()
                 afterEdit()
             }
@@ -193,7 +197,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.settingsButton).setOnClickListener { searchDialog() }
         findViewById<View>(R.id.exportButton).setOnClickListener { startExport() }
         findViewById<View>(R.id.resChip).setOnClickListener { exportSettingsDialog() }
-        findViewById<View>(R.id.keyframeButton).setOnClickListener { keyframeDialog() }
+        findViewById<View>(R.id.keyframeButton).setOnClickListener { toggleKeyframe() }
+        findViewById<View>(R.id.keyframeButton).setOnLongClickListener { keyframeDialog(); true }
+        findViewById<View>(R.id.graphButton).setOnClickListener { graphDialog() }
         refreshRes()
         buildToolbar()
 
@@ -338,9 +344,11 @@ class MainActivity : AppCompatActivity() {
         overlayView.playheadMs = ph
         overlayView.invalidate()
         timeLabel.text = "${fmt(ph)} / ${fmt(project.totalMs())}"
+        refreshKeyframeButton()
     }
 
     private fun syncUi() {
+        refreshKeyframeButton()
         if (toolbarKeyNow() != toolbarKey) buildToolbar()
         emptyPreview.visibility = if (project.isEmpty()) View.VISIBLE else View.GONE
         overlayView.canvasAspect = project.effectiveAspect()
@@ -2610,19 +2618,102 @@ class MainActivity : AppCompatActivity() {
 
     // ============================================================ keyframes / animation
 
+    /** The diamond button: adds a keyframe at the playhead, or removes the one that is there (like CapCut). */
+    private fun toggleKeyframe() {
+        val c = need(true) ?: return
+        engine.pause()
+        val local = (engine.playheadMs - c.startMs).coerceIn(0L, c.lengthMs)
+        project.checkpoint()
+        val ex = c.keyframes.firstOrNull { abs(it.tMs - local) < 60 }
+        if (ex != null) {
+            c.keyframes.remove(ex)
+            toast("Keyframe removed")
+        } else {
+            val cur = if (c.keyframes.isEmpty()) Keyframe(local) else Keyframes.valueAt(c.keyframes, local)
+            project.setKeyframe(c, Keyframe(local, cur.scale, cur.x, cur.y, cur.rot, 0, true))
+            toast("Keyframe added. Move the playhead, then move or zoom the picture for the next one.")
+        }
+        live(); afterEdit(); refreshKeyframeButton()
+    }
+
+    private fun refreshKeyframeButton() {
+        val c = project.selected()
+        val on = c != null && c.kind == LaneKind.VIDEO && c.keyframes.any { abs(it.tMs - (engine.playheadMs - c.startMs)) < 60 && (it.key || c.keyframes.size > 1) }
+        val b = findViewById<ImageButton>(R.id.keyframeButton) ?: return
+        b.setImageResource(if (on) R.drawable.ic_keyframe_fill else R.drawable.ic_keyframe)
+        b.setColorFilter(if (on) 0xFF00D1E8.toInt() else Color.WHITE)
+    }
+
+    private class CurveView(ctx: android.content.Context, private val id: Int, private val sel: Boolean) : View(ctx) {
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(cv: Canvas) {
+            val w = width.toFloat(); val h = height.toFloat(); val m = w * 0.18f
+            val bg = GradientDrawable(); bg.cornerRadius = w * 0.16f; bg.setColor(0xFF2E2E38.toInt())
+            if (sel) bg.setStroke((w * 0.045f).toInt().coerceAtLeast(2), Color.WHITE)
+            bg.setBounds(0, 0, width, height); bg.draw(cv)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f; p.color = 0x44FFFFFF
+            p.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 6f), 0f)
+            val y0 = h - m * 1.4f; val y1 = m * 1.4f
+            cv.drawLine(m, y0, w - m, y0, p); cv.drawLine(m, y1, w - m, y1, p)
+            p.pathEffect = null; p.strokeWidth = w * 0.035f; p.strokeCap = Paint.Cap.ROUND; p.color = if (sel) Color.WHITE else 0xFFD0D0D8.toInt()
+            val path = Path()
+            for (i in 0..40) {
+                val t = i / 40f
+                val v = Easing.apply(id, t).coerceIn(-0.35f, 1.35f)
+                val x = m + (w - 2 * m) * t; val y = y0 + (y1 - y0) * v
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            cv.drawPath(path, p)
+        }
+    }
+
+    /** The curve button: choose how fast the picture moves from the keyframe at the playhead to the next one. */
+    private fun graphDialog() {
+        val c = need(true) ?: return
+        engine.pause()
+        val sorted = c.keyframes.sortedBy { it.tMs }
+        if (sorted.size < 2) { toast("Graphs shape the movement between two keyframes. Tap the diamond to add keyframes first."); return }
+        val local = (engine.playheadMs - c.startMs).coerceAtLeast(0L)
+        val kf = sorted.lastOrNull { it.tMs <= local + 60 } ?: sorted.first()
+        if (kf === sorted.last()) { toast("Move the playhead onto a keyframe that has another keyframe after it."); return }
+        val scroll = HorizontalScrollView(this)
+        scroll.isHorizontalScrollBarEnabled = false
+        val row = LinearLayout(this)
+        scroll.addView(row)
+        val curves = ArrayList<Pair<Int, View>>()
+        fun mark() {
+            row.removeAllViews()
+            curves.clear()
+            Easing.NAMES.forEachIndexed { id, name ->
+                val col = LinearLayout(this)
+                col.orientation = LinearLayout.VERTICAL
+                col.gravity = Gravity.CENTER_HORIZONTAL
+                col.setPadding(dp(4), dp(4), dp(4), dp(4))
+                col.addView(CurveView(this, id, kf.ease == id || (kf.ease == 0 && id == 0)), LinearLayout.LayoutParams(dp(66), dp(66)))
+                val t = TextView(this)
+                t.text = name; t.textSize = 11f; t.setTextColor(if (kf.ease == id) Color.WHITE else 0xFFA0A0AA.toInt()); t.gravity = Gravity.CENTER; t.setPadding(0, dp(4), 0, 0)
+                col.addView(t, LinearLayout.LayoutParams(dp(70), ViewGroup.LayoutParams.WRAP_CONTENT))
+                col.setOnClickListener { kf.ease = id; mark(); live(); toast(name) }
+                row.addView(col)
+            }
+        }
+        mark()
+        lookSheet("Graphs", c, scroll, label("Shapes the speed of the movement from this keyframe to the next one."))
+    }
+
     private fun keyframeDialog() {
         val c = need(true) ?: return
         val local = (engine.playheadMs - c.startMs).coerceIn(0L, c.lengthMs)
         val cur = if (c.keyframes.isEmpty()) Keyframe(local) else Keyframes.valueAt(c.keyframes, local)
         var scale = cur.scale; var x = cur.x; var y = cur.y; var rot = cur.rot
-        fun put() { project.setKeyframe(c, Keyframe(local, scale, x, y, rot)); live() }
+        fun put() { project.setKeyframe(c, Keyframe(local, scale, x, y, rot, 0, true)); live() }
         lookSheet("Keyframe at ${fmt(engine.playheadMs)}", c,
             slider("Scale", 0.2f, 3f, scale, { "%d%%".format((it * 100).toInt()) }) { scale = it; put() },
             slider("Position X", -1f, 1f, x, { "%+d".format((it * 100).toInt()) }) { x = it; put() },
             slider("Position Y", -1f, 1f, y, { "%+d".format((it * 100).toInt()) }) { y = it; put() },
             slider("Rotation", -180f, 180f, rot, { "${it.toInt()}°" }) { rot = it; put() },
             button("Delete all keyframes") { c.keyframes.clear(); live() },
-            label("Move the playhead, open Keyframe again and set another value. The clip animates between them."))
+            label("Each change is saved as a keyframe at the playhead by itself. Move the playhead and change the values again; the clip animates between them. Use the curve button to shape the speed."))
     }
 
     private fun animationDialog() {

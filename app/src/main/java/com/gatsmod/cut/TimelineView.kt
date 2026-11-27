@@ -293,9 +293,10 @@ class TimelineView(context: Context, attrs: AttributeSet? = null) : View(context
             canvas.drawRoundRect(RectF(r.right - hw / 2f, r.centerY() - hh / 2f, r.right + hw / 2f, r.centerY() + hh / 2f), hw / 2f, hw / 2f, white)
             for (k in c.keyframes) {
                 val kx = xOf(c.startMs + k.tMs)
-                val ky = r.bottom - dp(7f)
-                val d = dp(4f)
+                val ky = r.centerY()
+                val d = dp(7f)
                 val path = Path().apply { moveTo(kx, ky - d); lineTo(kx + d, ky); lineTo(kx, ky + d); lineTo(kx - d, ky); close() }
+                kfPaint.color = if (abs(kx - width / 2f) < dp(9f)) 0xFFFF3B4F.toInt() else Color.WHITE
                 canvas.drawPath(path, kfPaint)
             }
         }

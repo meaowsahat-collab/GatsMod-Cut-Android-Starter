@@ -263,7 +263,7 @@ class PreviewEngine(private val ctx: Context, private val project: Project) {
         val blurLive = live && android.os.Build.VERSION.SDK_INT >= 31
         val fxKey = if (effectsOk) "$live|${c.id}|${c.filter}|${lv(c.brightness)}|${lv(c.contrast)}|${lv(c.saturation)}|${if (blurLive) 0f else c.blur}|${c.cropRatio}|${c.rotation}|${c.flipH}|${c.flipV}|${lv(c.temp)}|${lv(c.hue)}|${lv(c.lum)}|${lvI(c.fx)}|${lv(c.fxAmount)}|${lvI(c.maskShape)}|${lv(c.maskSize)}|${lv(c.maskFeather)}|${live || c.maskInvert}|${lv(c.maskX)}|${lv(c.maskY)}|${c.denoise}|${c.stab.hashCode()}|${c.animIn}|${lvL(c.animInMs)}|${c.animOut}|${lvL(c.animOutMs)}|${c.animCombo}|${c.textMotion}|${lv(c.exposure)}|${lv(c.tint)}|${lv(c.highlights)}|${lv(c.shadows)}|${lv(c.vibrance)}|${lv(c.fade)}|${lv(c.sharpen)}|${lv(c.vignette)}|${lv(c.grain)}|${if (c.hasAnim && !live) c.lengthMs else 0L}|${lvL(c.fadeInMs)}|${lvL(c.fadeOutMs)}|${if (!live && (c.fadeInMs > 0 || c.fadeOutMs > 0)) c.lengthMs else 0L}|" +
             "${c.chroma.enabled}|${c.chroma.key}|${c.chroma.similarity}|${c.chroma.smooth}|${c.chroma.bg}|" +
-            (if (live) "" else c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}" }) else "off"
+            (if (live) "" else c.keyframes.joinToString(",") { "${it.tMs}:${it.scale}:${it.x}:${it.y}:${it.rot}:${it.ease}" }) else "off"
         if (fxKey != appliedFx) {
             val hadAny = appliedFx != "\u0000"
             appliedFx = fxKey
