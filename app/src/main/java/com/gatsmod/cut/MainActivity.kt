@@ -2647,7 +2647,7 @@ class MainActivity : AppCompatActivity() {
         b.setColorFilter(if (on) 0xFF00D1E8.toInt() else Color.WHITE)
     }
 
-    private class CurveView(ctx: android.content.Context, var id: Int, var sel: Boolean, val big: Boolean = false) : View(ctx) {
+    private class CurveView(ctx: android.content.Context, var curve: Int, var sel: Boolean, val big: Boolean = false) : View(ctx) {
         private fun dp(v: Float) = v * resources.displayMetrics.density
         private val p = Paint(Paint.ANTI_ALIAS_FLAG)
         var ball = -1f
@@ -2675,7 +2675,7 @@ class MainActivity : AppCompatActivity() {
             val path = Path()
             for (i in 0..48) {
                 val t = i / 48f
-                val v = Easing.apply(id, t).coerceIn(-0.4f, 1.4f)
+                val v = Easing.apply(curve, t).coerceIn(-0.4f, 1.4f)
                 val x = gx0 + (gx1 - gx0) * t; val y = gy0 + (gy1 - gy0) * v
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
@@ -2684,7 +2684,7 @@ class MainActivity : AppCompatActivity() {
             if (sel) { p.shader = sh; p.strokeWidth = dp(if (big) 9f else 6f); p.alpha = 55; cv.drawPath(path, p) }
             p.shader = sh; p.alpha = 255; p.strokeWidth = dp(if (big) 3f else 2.2f); cv.drawPath(path, p); p.shader = null
             if (ball >= 0f) {
-                val v = Easing.apply(id, ball)
+                val v = Easing.apply(curve, ball)
                 val bx = gx0 + (gx1 - gx0) * ball; val by = gy0 + (gy1 - gy0) * v.coerceIn(-0.4f, 1.4f)
                 p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt(); cv.drawCircle(bx, by, dp(if (big) 5f else 3.5f), p)
                 if (big) {
@@ -2769,7 +2769,7 @@ class MainActivity : AppCompatActivity() {
         val cats = Easing.CATEGORIES.map { it.first } + "Custom"
         var catIdx = if (Easing.isCustom(kf.ease)) cats.size - 1 else 0
         val chips = ArrayList<TextView>()
-        fun pick(id: Int) { kf.ease = id; big.id = id; big.invalidate(); nameLine.text = nameOf(id); live() }
+        fun pick(id: Int) { kf.ease = id; big.curve = id; big.invalidate(); nameLine.text = nameOf(id); live() }
         fun showCat() {
             chips.forEachIndexed { k, t ->
                 val g = GradientDrawable(); g.cornerRadius = dp(16).toFloat()
