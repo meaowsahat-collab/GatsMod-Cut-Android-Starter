@@ -15,7 +15,10 @@
   "lookName": "Golden glow",
   "fx": 8,
   "fxAmount": 0.35,
-  "sparkle": true
+  "sparkle": true,
+  "motion": "kb",
+  "leak": 1,
+  "cutout": true
  },
  {
   "id": "stardust",
@@ -32,7 +35,9 @@
   "look": "Candy",
   "lookName": "Candy",
   "sparkle": true,
-  "title": "Shine"
+  "title": "Shine",
+  "motion": "pulse",
+  "cutout": true
  },
  {
   "id": "blurrush",
@@ -47,7 +52,9 @@
   "trans": "Motion blur",
   "kenBurns": false,
   "look": "HDR",
-  "lookName": "HDR punch"
+  "lookName": "HDR punch",
+  "motion": "shake",
+  "leak": 2
  },
  {
   "id": "lux2",
@@ -64,7 +71,9 @@
   "look": "Cinema",
   "lookName": "Cinema",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "zoomin",
+  "bars": true
  },
  {
   "id": "spinfun",
@@ -80,7 +89,9 @@
   "kenBurns": false,
   "look": "Vivid",
   "lookName": "Vivid",
-  "title": "Party!"
+  "title": "Party!",
+  "motion": "rotate",
+  "leak": 1
  },
  {
   "id": "misty",
@@ -95,7 +106,9 @@
   "trans": "Dissolve",
   "kenBurns": true,
   "look": "Haze",
-  "lookName": "Haze"
+  "lookName": "Haze",
+  "motion": "drift",
+  "leak": 1
  },
  {
   "id": "g006",
@@ -112,7 +125,10 @@
   "look": "Cinema",
   "lookName": "Cinema",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "kb",
+  "bars": true,
+  "leak": 2
  },
  {
   "id": "g007",
@@ -129,7 +145,9 @@
   "look": "Teal Orange",
   "lookName": "Teal Orange",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "zoomin",
+  "bars": true
  },
  {
   "id": "g008",
@@ -145,7 +163,9 @@
   "kenBurns": true,
   "look": "Moody",
   "lookName": "Moody",
-  "title": "CHAPTER ONE"
+  "title": "CHAPTER ONE",
+  "motion": "pushpull",
+  "bars": true
  },
  {
   "id": "g009",
@@ -163,7 +183,9 @@
   "lookName": "Noir",
   "fx": 1,
   "fxAmount": 0.4,
-  "title": "COMING SOON"
+  "title": "COMING SOON",
+  "motion": "drift",
+  "bars": true
  },
  {
   "id": "g010",
@@ -180,7 +202,9 @@
   "look": "Dark",
   "lookName": "Dark",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "kb",
+  "leak": 2
  },
  {
   "id": "g011",
@@ -195,7 +219,9 @@
   "trans": "Flash",
   "kenBurns": true,
   "look": "Film",
-  "lookName": "Film"
+  "lookName": "Film",
+  "motion": "zoomin",
+  "bars": true
  },
  {
   "id": "g012",
@@ -212,7 +238,9 @@
   "look": "Ice",
   "lookName": "Ice",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "pushpull",
+  "bars": true
  },
  {
   "id": "g013",
@@ -230,7 +258,8 @@
   "lookName": "Cold",
   "fx": 1,
   "fxAmount": 0.4,
-  "title": "CHAPTER ONE"
+  "title": "CHAPTER ONE",
+  "motion": "drift"
  },
  {
   "id": "g014",
@@ -246,7 +275,10 @@
   "kenBurns": true,
   "look": "Gloom",
   "lookName": "Gloom",
-  "title": "COMING SOON"
+  "title": "COMING SOON",
+  "motion": "kb",
+  "bars": true,
+  "leak": 1
  },
  {
   "id": "g015",
@@ -263,7 +295,8 @@
   "look": "Matte",
   "lookName": "Matte",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "zoomin"
  },
  {
   "id": "g016",
@@ -280,7 +313,10 @@
   "look": "Cinema",
   "lookName": "Cinema",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "pushpull",
+  "bars": true,
+  "leak": 1
  },
  {
   "id": "g017",
@@ -295,7 +331,8 @@
   "trans": "Dissolve",
   "kenBurns": true,
   "look": "Teal Orange",
-  "lookName": "Teal Orange"
+  "lookName": "Teal Orange",
+  "motion": "drift"
  },
  {
   "id": "g018",
@@ -312,7 +349,8 @@
   "look": "Sunny",
   "lookName": "Sunny",
   "fx": 2,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "kb"
  },
  {
   "id": "g019",
@@ -328,7 +366,9 @@
   "kenBurns": true,
   "look": "Golden",
   "lookName": "Golden",
-  "title": "My Day"
+  "title": "My Day",
+  "motion": "drift",
+  "cutout": true
  },
  {
   "id": "g020",
@@ -344,7 +384,8 @@
   "kenBurns": true,
   "look": "Warm",
   "lookName": "Warm",
-  "title": "Weekend"
+  "title": "Weekend",
+  "motion": "pushpull"
  },
  {
   "id": "g021",
@@ -362,7 +403,9 @@
   "lookName": "Fresh",
   "fx": 2,
   "fxAmount": 0.4,
-  "title": "Travel Diary"
+  "title": "Travel Diary",
+  "motion": "rotate",
+  "cutout": true
  },
  {
   "id": "g022",
@@ -377,7 +420,10 @@
   "trans": "Slide left",
   "kenBurns": true,
   "look": "Natural",
-  "lookName": "Natural"
+  "lookName": "Natural",
+  "motion": "kb",
+  "leak": 2,
+  "cutout": true
  },
  {
   "id": "g023",
@@ -392,7 +438,8 @@
   "trans": "Slide up",
   "kenBurns": true,
   "look": "Spring",
-  "lookName": "Spring"
+  "lookName": "Spring",
+  "motion": "drift"
  },
  {
   "id": "g024",
@@ -410,7 +457,9 @@
   "lookName": "Ocean",
   "fx": 2,
   "fxAmount": 0.4,
-  "title": "My Day"
+  "title": "My Day",
+  "motion": "pushpull",
+  "cutout": true
  },
  {
   "id": "g025",
@@ -426,7 +475,9 @@
   "kenBurns": true,
   "look": "Autumn",
   "lookName": "Autumn",
-  "title": "Weekend"
+  "title": "Weekend",
+  "motion": "rotate",
+  "leak": 1
  },
  {
   "id": "g026",
@@ -442,7 +493,8 @@
   "kenBurns": true,
   "look": "Clear",
   "lookName": "Clear",
-  "title": "Travel Diary"
+  "title": "Travel Diary",
+  "motion": "kb"
  },
  {
   "id": "g027",
@@ -459,7 +511,9 @@
   "look": "Peach",
   "lookName": "Peach",
   "fx": 2,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "drift",
+  "leak": 1
  },
  {
   "id": "g028",
@@ -474,7 +528,8 @@
   "trans": "Slide up",
   "kenBurns": true,
   "look": "Sunny",
-  "lookName": "Sunny"
+  "lookName": "Sunny",
+  "motion": "pushpull"
  },
  {
   "id": "g029",
@@ -490,7 +545,8 @@
   "kenBurns": true,
   "look": "Golden",
   "lookName": "Golden",
-  "title": "My Day"
+  "title": "My Day",
+  "motion": "rotate"
  },
  {
   "id": "g030",
@@ -508,7 +564,10 @@
   "lookName": "Peach",
   "fx": 8,
   "fxAmount": 0.4,
-  "sparkle": true
+  "sparkle": true,
+  "motion": "kb",
+  "leak": 1,
+  "frame": true
  },
  {
   "id": "g031",
@@ -526,7 +585,9 @@
   "lookName": "Rose",
   "fx": 8,
   "fxAmount": 0.4,
-  "title": "Memories"
+  "title": "Memories",
+  "motion": "drift",
+  "leak": 1
  },
  {
   "id": "g032",
@@ -542,7 +603,8 @@
   "kenBurns": true,
   "look": "Pastel",
   "lookName": "Pastel",
-  "title": "Us"
+  "title": "Us",
+  "motion": "rotate"
  },
  {
   "id": "g033",
@@ -561,7 +623,9 @@
   "fx": 8,
   "fxAmount": 0.4,
   "title": "Moments",
-  "sparkle": true
+  "sparkle": true,
+  "motion": "pushpull",
+  "frame": true
  },
  {
   "id": "g034",
@@ -578,7 +642,8 @@
   "look": "Candy",
   "lookName": "Candy",
   "fx": 8,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "kb"
  },
  {
   "id": "g035",
@@ -593,7 +658,10 @@
   "trans": "Zoom",
   "kenBurns": true,
   "look": "Haze",
-  "lookName": "Haze"
+  "lookName": "Haze",
+  "motion": "drift",
+  "leak": 2,
+  "cutout": true
  },
  {
   "id": "g036",
@@ -612,7 +680,9 @@
   "fx": 8,
   "fxAmount": 0.4,
   "title": "Memories",
-  "sparkle": true
+  "sparkle": true,
+  "motion": "rotate",
+  "frame": true
  },
  {
   "id": "g037",
@@ -630,7 +700,8 @@
   "lookName": "Fade",
   "fx": 8,
   "fxAmount": 0.4,
-  "title": "Us"
+  "title": "Us",
+  "motion": "pushpull"
  },
  {
   "id": "g038",
@@ -646,7 +717,10 @@
   "kenBurns": true,
   "look": "Film",
   "lookName": "Film",
-  "title": "Moments"
+  "title": "Moments",
+  "motion": "kb",
+  "leak": 1,
+  "cutout": true
  },
  {
   "id": "g039",
@@ -664,7 +738,10 @@
   "lookName": "Natural",
   "fx": 8,
   "fxAmount": 0.4,
-  "sparkle": true
+  "sparkle": true,
+  "motion": "drift",
+  "frame": true,
+  "cutout": true
  },
  {
   "id": "g040",
@@ -681,7 +758,8 @@
   "look": "Peach",
   "lookName": "Peach",
   "fx": 8,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "rotate"
  },
  {
   "id": "g041",
@@ -697,7 +775,9 @@
   "kenBurns": true,
   "look": "Rose",
   "lookName": "Rose",
-  "title": "Memories"
+  "title": "Memories",
+  "motion": "pushpull",
+  "leak": 1
  },
  {
   "id": "g042",
@@ -710,11 +790,13 @@
   "maxClips": 11,
   "music": "funk",
   "trans": "Pop",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Vivid",
   "lookName": "Vivid",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "pulse",
+  "leak": 1
  },
  {
   "id": "g043",
@@ -731,7 +813,9 @@
   "look": "Punch",
   "lookName": "Punch",
   "fx": 4,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "shake",
+  "leak": 1
  },
  {
   "id": "g044",
@@ -747,7 +831,9 @@
   "kenBurns": false,
   "look": "HDR",
   "lookName": "HDR",
-  "title": "HYPE"
+  "title": "HYPE",
+  "motion": "zoomin",
+  "leak": 1
  },
  {
   "id": "g045",
@@ -760,12 +846,14 @@
   "maxClips": 10,
   "music": "funk",
   "trans": "Motion blur",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Neon",
   "lookName": "Neon",
   "fx": 1,
   "fxAmount": 0.4,
-  "title": "BEAT"
+  "title": "BEAT",
+  "motion": "pulse",
+  "leak": 2
  },
  {
   "id": "g046",
@@ -778,11 +866,12 @@
   "maxClips": 12,
   "music": "pop",
   "trans": "Flash",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Cyber",
   "lookName": "Cyber",
   "fx": 4,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "shake"
  },
  {
   "id": "g047",
@@ -797,7 +886,8 @@
   "trans": "Pop",
   "kenBurns": true,
   "look": "Lomo",
-  "lookName": "Lomo"
+  "lookName": "Lomo",
+  "motion": "zoomin"
  },
  {
   "id": "g048",
@@ -814,7 +904,9 @@
   "look": "Cherry",
   "lookName": "Cherry",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "pulse",
+  "leak": 1
  },
  {
   "id": "g049",
@@ -832,7 +924,9 @@
   "lookName": "Violet",
   "fx": 4,
   "fxAmount": 0.4,
-  "title": "HYPE"
+  "title": "HYPE",
+  "motion": "shake",
+  "leak": 2
  },
  {
   "id": "g050",
@@ -848,7 +942,8 @@
   "kenBurns": true,
   "look": "Dark",
   "lookName": "Dark",
-  "title": "BEAT"
+  "title": "BEAT",
+  "motion": "zoomin"
  },
  {
   "id": "g051",
@@ -861,11 +956,13 @@
   "maxClips": 12,
   "music": "funk",
   "trans": "Flash",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Teal Orange",
   "lookName": "Teal Orange",
   "fx": 1,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "pulse",
+  "leak": 1
  },
  {
   "id": "g052",
@@ -878,11 +975,12 @@
   "maxClips": 12,
   "music": "pop",
   "trans": "Pop",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Vivid",
   "lookName": "Vivid",
   "fx": 4,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "shake"
  },
  {
   "id": "g053",
@@ -897,7 +995,9 @@
   "trans": "Spin",
   "kenBurns": false,
   "look": "Punch",
-  "lookName": "Punch"
+  "lookName": "Punch",
+  "motion": "zoomin",
+  "cutout": true
  },
  {
   "id": "g054",
@@ -910,10 +1010,11 @@
   "maxClips": 10,
   "music": "funk",
   "trans": "Slide left",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Candy",
   "lookName": "Candy",
-  "sparkle": true
+  "sparkle": true,
+  "motion": "pulse"
  },
  {
   "id": "g055",
@@ -931,7 +1032,9 @@
   "lookName": "Vivid",
   "fx": 4,
   "fxAmount": 0.4,
-  "title": "Party!"
+  "title": "Party!",
+  "motion": "rotate",
+  "frame": true
  },
  {
   "id": "g056",
@@ -944,10 +1047,12 @@
   "maxClips": 10,
   "music": "funk",
   "trans": "Pop",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Sunny",
   "lookName": "Sunny",
-  "title": "Squad"
+  "title": "Squad",
+  "motion": "shake",
+  "cutout": true
  },
  {
   "id": "g057",
@@ -964,7 +1069,9 @@
   "look": "Neon",
   "lookName": "Neon",
   "title": "Good Vibes",
-  "sparkle": true
+  "sparkle": true,
+  "motion": "drift",
+  "frame": true
  },
  {
   "id": "g058",
@@ -977,12 +1084,13 @@
   "maxClips": 10,
   "music": "funk",
   "trans": "Flash",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Cherry",
   "lookName": "Cherry",
   "fx": 4,
   "fxAmount": 0.4,
-  "title": "Birthday!"
+  "title": "Birthday!",
+  "motion": "pulse"
  },
  {
   "id": "g059",
@@ -997,7 +1105,8 @@
   "trans": "Slide left",
   "kenBurns": true,
   "look": "Violet",
-  "lookName": "Violet"
+  "lookName": "Violet",
+  "motion": "rotate"
  },
  {
   "id": "g060",
@@ -1014,7 +1123,9 @@
   "look": "Punch",
   "lookName": "Punch",
   "title": "Party!",
-  "sparkle": true
+  "sparkle": true,
+  "motion": "shake",
+  "cutout": true
  },
  {
   "id": "g061",
@@ -1032,7 +1143,10 @@
   "lookName": "Spring",
   "fx": 4,
   "fxAmount": 0.4,
-  "title": "Squad"
+  "title": "Squad",
+  "motion": "drift",
+  "leak": 1,
+  "cutout": true
  },
  {
   "id": "g062",
@@ -1048,7 +1162,10 @@
   "kenBurns": false,
   "look": "Pastel",
   "lookName": "Pastel",
-  "title": "Good Vibes"
+  "title": "Good Vibes",
+  "motion": "pulse",
+  "leak": 1,
+  "cutout": true
  },
  {
   "id": "g063",
@@ -1065,7 +1182,9 @@
   "look": "Retro",
   "lookName": "Retro",
   "title": "Birthday!",
-  "sparkle": true
+  "sparkle": true,
+  "motion": "rotate",
+  "frame": true
  },
  {
   "id": "g064",
@@ -1078,11 +1197,12 @@
   "maxClips": 9,
   "music": "funk",
   "trans": "Slide left",
-  "kenBurns": true,
+  "kenBurns": false,
   "look": "Candy",
   "lookName": "Candy",
   "fx": 4,
-  "fxAmount": 0.4
+  "fxAmount": 0.4,
+  "motion": "shake"
  },
  {
   "id": "g065",
@@ -1098,6 +1218,9 @@
   "kenBurns": false,
   "look": "Vivid",
   "lookName": "Vivid",
-  "title": "Party!"
+  "title": "Party!",
+  "motion": "drift",
+  "frame": true,
+  "cutout": true
  }
 ]

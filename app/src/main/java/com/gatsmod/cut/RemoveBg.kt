@@ -13,6 +13,10 @@ class RemoveBg(private val blurBackground: Boolean, private val color: Int, priv
         SelfieSegmenterOptions.Builder().setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE).enableRawSizeMask().build()
     )
     private var prev: FloatArray? = null
+    private var cutMode = false
+
+    /** The person with a transparent background (for a sticker), or null if the model failed. */
+    fun cutout(src: Bitmap): Bitmap? { cutMode = true; try { return process(src) } finally { cutMode = false } }
 
     /** Returns [src] with the background replaced, or null if the model failed on this frame. */
     fun process(src: Bitmap): Bitmap? {
@@ -124,6 +128,12 @@ class RemoveBg(private val blurBackground: Boolean, private val color: Int, priv
         // snap the soft mask to the real edges of the picture (guided filter on brightness)
         val lum = FloatArray(w * h) { val c = px[it]; (0.299f * ((c shr 16) and 255) + 0.587f * ((c shr 8) and 255) + 0.114f * (c and 255)) / 255f }
         val alpha = MaskMath.refine(m, mw, mh, lum, w, h, maxOf(4, maxOf(w, h) / 110), 0.0008f)
+        if (cutMode) {
+            for (i in 0 until w * h) { val a = MaskMath.edge(alpha[i], 0.3f, 0.7f); px[i] = (px[i] and 0xFFFFFF) or ((a * 255f).toInt().coerceIn(0, 255) shl 24) }
+            val o2 = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            o2.setPixels(px, 0, w, 0, 0, w, h)
+            return o2
+        }
         for (y in 0 until h) for (x in 0 until w) {
             val i = y * w + x
             val a = MaskMath.edge(alpha[i], 0.3f, 0.7f)

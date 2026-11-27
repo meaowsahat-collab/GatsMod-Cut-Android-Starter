@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
 import kotlin.math.max
 import kotlin.math.min
@@ -21,7 +22,9 @@ object Templates {
         val slotMs: Long, val maxClips: Int,
         val music: String?, val title: String?, val titleColor: Int = Color.WHITE,
         val transName: String, val trans: Pair<Int, Int>?, val dipMs: Long = 0L,
-        val kenBurns: Boolean, val lookName: String, val sparkle: Boolean = false, val look: (Clip) -> Unit
+        val kenBurns: Boolean, val lookName: String, val sparkle: Boolean = false,
+        val motion: String = "", val leak: Int = 0, val bars: Boolean = false, val frame: Boolean = false, val cutout: Boolean = false,
+        val look: (Clip) -> Unit
     ) {
         val totalMs: Long get() = slotMs * maxClips
         val musicName: String get() = SoundGen.MUSIC.firstOrNull { it.id == music }?.name ?: "No music"
@@ -32,11 +35,86 @@ object Templates {
             "Music: $musicName" + if (music != null) " (made inside the app)" else "",
             if (title != null) "Title: \"$title\"" else "No title text",
             if (kenBurns) "Slow zoom on photos" else "Photos stay still",
-            if (sparkle) "Twinkling sparkles on top" else null
+            if (sparkle) "Twinkling sparkles on top" else null,
+            if (motion.isNotBlank()) "Motion: " + (MOTIONS[motion] ?: motion) else null,
+            if (leak > 0) "Light leaks" else null,
+            if (bars) "Cinema bars" else null,
+            if (frame) "Photo frame" else null,
+            if (cutout) "Person cut-out sticker pops out (photos with a person)" else null
         )
     }
 
     val CATS = listOf("All", "Cinematic", "Vlog", "Photo", "Music", "Fun")
+
+    val MOTIONS = mapOf("kb" to "slow zoom", "pulse" to "beat pulse", "shake" to "camera shake", "drift" to "side drift", "rotate" to "tilt", "zoomin" to "fast push-in", "pushpull" to "pull back")
+
+    /** Camera motion for one clip as keyframes (scale, x, y in screen units, rotation in degrees). Used by the preview and the export alike. */
+    fun motionFrames(m: String, len: Long, seed: Int): MutableList<Keyframe> {
+        val l = max(400L, len)
+        val r = java.util.Random(seed * 131L + 7)
+        val f = ArrayList<Keyframe>()
+        when (m) {
+            "kb" -> { f.add(Keyframe(0, 1f, 0f, 0f, 0f)); f.add(Keyframe(l, 1.14f, 0f, 0f, 0f)) }
+            "pulse" -> { var t = 0L; while (t < l) { f.add(Keyframe(t, 1.0f)); f.add(Keyframe(min(l, t + 110), 1.11f)); f.add(Keyframe(min(l, t + 420), 1.0f)); t += 500 }; f.add(Keyframe(l, 1.04f)) }
+            "shake" -> { var t = 0L; while (t <= l) { f.add(Keyframe(t, 1.07f, (r.nextFloat() - 0.5f) * 0.035f, (r.nextFloat() - 0.5f) * 0.03f, (r.nextFloat() - 0.5f) * 1.6f)); t += 80 } }
+            "drift" -> { val d = if (seed % 2 == 0) 1f else -1f; f.add(Keyframe(0, 1.16f, -0.07f * d, 0f, 0f)); f.add(Keyframe(l, 1.16f, 0.07f * d, 0f, 0f)) }
+            "rotate" -> { val d = if (seed % 2 == 0) 1f else -1f; f.add(Keyframe(0, 1.2f, 0f, 0f, -3.5f * d)); f.add(Keyframe(l, 1.2f, 0f, 0f, 3.5f * d)) }
+            "zoomin" -> { f.add(Keyframe(0, 1f)); f.add(Keyframe(l / 3, 1.22f)); f.add(Keyframe(l, 1.36f)) }
+            "pushpull" -> { f.add(Keyframe(0, 1.22f)); f.add(Keyframe(l, 1f)) }
+            else -> { f.add(Keyframe(0, 1f)); f.add(Keyframe(l, 1f)) }
+        }
+        return f
+    }
+
+    fun motionAt(m: String, len: Long, tMs: Long, seed: Int): Keyframe = Keyframes.valueAt(motionFrames(m, len, seed), tMs)
+
+    /** Transparent full-frame pictures laid on top of the edit: cinema bars, a photo frame and light leaks. */
+    fun overlayFile(ctx: Context, kind: String): java.io.File {
+        val f = java.io.File(java.io.File(ctx.filesDir, "tpl").apply { mkdirs() }, "ov_$kind.png")
+        if (f.exists() && f.length() > 100) return f
+        val W = 1080; val H = 1920
+        val b = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val cv = Canvas(b); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        when (kind) {
+            "bars" -> { p.color = Color.BLACK; cv.drawRect(0f, 0f, W.toFloat(), H * 0.1f, p); cv.drawRect(0f, H * 0.9f, W.toFloat(), H.toFloat(), p) }
+            "frame" -> {
+                val path = android.graphics.Path(); path.fillType = android.graphics.Path.FillType.EVEN_ODD
+                path.addRect(0f, 0f, W.toFloat(), H.toFloat(), android.graphics.Path.Direction.CW)
+                path.addRoundRect(RectF(W * 0.06f, H * 0.045f, W * 0.94f, H * 0.83f), 14f, 14f, android.graphics.Path.Direction.CW)
+                p.color = 0xFFF8F4EC.toInt(); cv.drawPath(path, p)
+            }
+            "leak0" -> { p.shader = android.graphics.LinearGradient(0f, 0f, W * 0.75f, 0f, intArrayOf(0xCCFF9A3C.toInt(), 0x66FF5E7A, 0x00FF5E7A), floatArrayOf(0f, 0.45f, 1f), android.graphics.Shader.TileMode.CLAMP); cv.drawRect(0f, 0f, W.toFloat(), H.toFloat(), p) }
+            "leak1" -> { p.shader = android.graphics.LinearGradient(W.toFloat(), 0f, W * 0.25f, 0f, intArrayOf(0xCCFF5C9A.toInt(), 0x66FFB347, 0x00FFB347), floatArrayOf(0f, 0.45f, 1f), android.graphics.Shader.TileMode.CLAMP); cv.drawRect(0f, 0f, W.toFloat(), H.toFloat(), p) }
+            else -> { p.shader = android.graphics.RadialGradient(W * 0.85f, H * 0.12f, W * 1.1f, intArrayOf(0xDDFFE08A.toInt(), 0x66FFA040, 0x00FFA040), floatArrayOf(0f, 0.4f, 1f), android.graphics.Shader.TileMode.CLAMP); cv.drawRect(0f, 0f, W.toFloat(), H.toFloat(), p) }
+        }
+        f.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return f
+    }
+
+    /** A person cut out of a photo with a white outline, cropped tight, saved as PNG. Null if no person was found. */
+    fun stickerFile(ctx: Context, frame: Bitmap, name: String): java.io.File? {
+        val rb = RemoveBg(false, 0, null)
+        try {
+            val cut = rb.cutout(frame) ?: return null
+            val w = cut.width; val h = cut.height
+            val px = IntArray(w * h); cut.getPixels(px, 0, w, 0, 0, w, h)
+            var x0 = w; var y0 = h; var x1 = -1; var y1 = -1; var cnt = 0
+            for (y in 0 until h) for (x in 0 until w) if ((px[y * w + x] ushr 24) > 128) { cnt++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+            if (cnt < w * h * 0.04f || x1 <= x0) return null
+            val pad = max(w, h) / 60
+            val r = max(w, h) * 0.012f
+            val out = Bitmap.createBitmap(x1 - x0 + 1 + pad * 2, y1 - y0 + 1 + pad * 2, Bitmap.Config.ARGB_8888)
+            val cv = Canvas(out)
+            val white = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG); white.colorFilter = android.graphics.PorterDuffColorFilter(Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
+            for (k in 0 until 16) { val a = k * Math.PI / 8; cv.drawBitmap(cut, -x0 + pad + (Math.cos(a) * r).toFloat(), -y0 + pad + (Math.sin(a) * r).toFloat(), white) }
+            cv.drawBitmap(cut, (-x0 + pad).toFloat(), (-y0 + pad).toFloat(), Paint(Paint.FILTER_BITMAP_FLAG))
+            val sc = min(1f, 720f / max(out.width, out.height))
+            val fin = if (sc < 1f) Bitmap.createScaledBitmap(out, (out.width * sc).toInt(), (out.height * sc).toInt(), true) else out
+            val f = java.io.File(java.io.File(ctx.filesDir, "tpl").apply { mkdirs() }, "cut_$name.png")
+            f.outputStream().use { fin.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            return f
+        } catch (_: Throwable) { return null } finally { rb.close() }
+    }
 
     private fun fi(n: String) = Fx.FILTERS.indexOfFirst { it.name == n }.coerceAtLeast(0)
 
@@ -161,7 +239,8 @@ object Templates {
                     o.optLong("slotMs", 1800L).coerceIn(500L, 6000L), o.optInt("maxClips", 8).coerceIn(2, 12), music,
                     o.optString("title", "").ifBlank { null }, col(o.optString("titleColor"), Color.WHITE),
                     tr, pair, o.optLong("dipMs", if (tr == "Dip to black") 500L else 0L), o.optBoolean("kenBurns", true),
-                    o.optString("lookName", fname.ifBlank { "Custom" }), o.optBoolean("sparkle", false)) { c ->
+                    o.optString("lookName", fname.ifBlank { "Custom" }), o.optBoolean("sparkle", false),
+                    o.optString("motion", ""), o.optInt("leak", 0), o.optBoolean("bars", false), o.optBoolean("frame", false), o.optBoolean("cutout", false)) { c ->
                     if (fname.isNotBlank()) c.filter = fi(fname)
                     c.brightness = br; c.contrast = co; c.saturation = sa; c.temp = te; c.fx = fx; c.fxAmount = fa
                 })

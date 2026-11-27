@@ -240,6 +240,11 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
     private val rnd = Random(1)
     private val tmp = Rect()
     private var vig: RadialGradient? = null
+    private val mo = if (t.motion.isNotBlank()) t.motion else if (t.kenBurns) "kb" else ""
+    private var curIdx = -1
+    private var prevIdx = -1
+    private var curK = Keyframe(0)
+    private var prevK = Keyframe(0)
 
     init {
         outlineProvider = object : ViewOutlineProvider() {
@@ -274,9 +279,13 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
         val sc = max(width.toFloat() / b.width, height.toFloat() / b.height)
         paint.colorFilter = cf
         paint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+        val mk = if (idx == curIdx) curK else if (idx == prevIdx) prevK else null
+        val ex = if (mk != null) mk.x * width / 2f else 0f
+        val ey = if (mk != null) -mk.y * height / 2f else 0f
+        val er = if (mk != null) -mk.rot else 0f
         cv.save()
-        cv.translate(width / 2f + tx, height / 2f + ty)
-        cv.rotate(rot)
+        cv.translate(width / 2f + tx + ex, height / 2f + ty + ey)
+        cv.rotate(rot + er)
         cv.scale(s * sc, s * sc)
         cv.translate(-b.width / 2f, -b.height / 2f)
         cv.drawBitmap(b, 0f, 0f, paint)
@@ -294,9 +303,11 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
         val i = (now / slotD).toInt().coerceIn(0, n - 1)
         val lt = now - i * slotD
         val prev = (i - 1 + n) % n
-        val kb = if (t.kenBurns) 1f else 0f
-        val sCur = 1f + 0.14f * kb * (lt / slotD)
-        val sPrev = 1f + 0.14f * kb
+        curIdx = i; prevIdx = prev
+        curK = if (mo.isNotBlank()) Templates.motionAt(mo, slotD.toLong(), lt.toLong(), i) else Keyframe(0)
+        prevK = if (mo.isNotBlank()) Templates.motionAt(mo, slotD.toLong(), slotD.toLong(), prev) else Keyframe(0)
+        val sCur = curK.scale
+        val sPrev = prevK.scale
         val trD = if (t.trans != null) (if (t.transName == "Dissolve") slotD * 0.55f else min(450f, slotD * 0.4f)) else if (t.dipMs > 0) 700f else 0f
         cv.drawColor(Color.BLACK)
         val q = if (trD > 0f && lt < trD && i > 0 || (trD > 0f && lt < trD && i == 0 && now == lt && false)) lt / trD else 1f
@@ -355,6 +366,44 @@ class TemplatePreview(ctx: Context, private val t: Templates.T) : View(ctx) {
                 cv.drawRect(0f, 0f, w, h, paint); paint.shader = null
             }
         }
+        if (t.leak > 0) {
+            val ph = (now / 900f) % 1f
+            val a = kotlin.math.sin(ph * Math.PI).toFloat().coerceIn(0f, 1f)
+            val kind = ((now / 900f).toInt() + t.id.length) % 3
+            paint.colorFilter = null; paint.alpha = 255
+            paint.shader = when (kind) {
+                0 -> LinearGradient(0f, 0f, w * 0.75f, 0f, intArrayOf(Color.argb((205 * a).toInt(), 255, 154, 60), Color.argb((100 * a).toInt(), 255, 94, 122), 0), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+                1 -> LinearGradient(w, 0f, w * 0.25f, 0f, intArrayOf(Color.argb((205 * a).toInt(), 255, 92, 154), Color.argb((100 * a).toInt(), 255, 179, 71), 0), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+                else -> RadialGradient(w * 0.85f, h * 0.12f, w * 1.1f, intArrayOf(Color.argb((220 * a).toInt(), 255, 224, 138), Color.argb((100 * a).toInt(), 255, 160, 64), 0), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
+            }
+            cv.drawRect(0f, 0f, w, h, paint); paint.shader = null
+        }
+        if (t.cutout) {
+            val ph = ((now % slotD) / slotD)
+            if (ph in 0.35f..0.8f) {
+                val q2 = ((ph - 0.35f) / 0.15f).coerceIn(0f, 1f)
+                val b = scenes[(i + off) % scenes.size]
+                val sw = w * 0.42f * back(q2).coerceAtMost(1.1f); val sh = sw * 1.35f
+                val left = i % 2 == 0
+                val cx = if (left) w * 0.3f else w * 0.7f; val cy = h * 0.72f
+                cv.save(); cv.translate(cx, cy); cv.rotate(if (left) -5f else 5f)
+                paint.colorFilter = null; paint.shader = null; paint.color = Color.WHITE; paint.alpha = 255
+                cv.drawRoundRect(RectF(-sw / 2 - 5, -sh / 2 - 5, sw / 2 + 5, sh / 2 + 5), 18f, 18f, paint)
+                val sc = max(sw / b.width, sh / b.height)
+                cv.clipRect(-sw / 2, -sh / 2, sw / 2, sh / 2)
+                cv.scale(sc, sc); cv.translate(-b.width / 2f, -b.height / 2f)
+                paint.colorFilter = cf; cv.drawBitmap(b, 0f, 0f, paint)
+                cv.restore()
+            }
+        }
+        if (t.frame) {
+            val path = Path(); path.fillType = Path.FillType.EVEN_ODD
+            path.addRect(0f, 0f, w, h, Path.Direction.CW)
+            path.addRoundRect(RectF(w * 0.06f, h * 0.045f, w * 0.94f, h * 0.83f), 5f, 5f, Path.Direction.CW)
+            paint.colorFilter = null; paint.shader = null; paint.color = 0xFFF8F4EC.toInt(); paint.alpha = 255
+            cv.drawPath(path, paint)
+        }
+        if (t.bars) { paint.colorFilter = null; paint.shader = null; paint.color = Color.BLACK; paint.alpha = 255; cv.drawRect(0f, 0f, w, h * 0.1f, paint); cv.drawRect(0f, h * 0.9f, w, h, paint) }
         if (t.sparkle) {
             val tick = SystemClock.uptimeMillis() / 380
             paint.colorFilter = null; paint.shader = null; paint.style = Paint.Style.FILL

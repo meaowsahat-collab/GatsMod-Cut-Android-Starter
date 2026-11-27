@@ -393,7 +393,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { u }
     }
 
-    private class Spec(val uri: String, val durMs: Long, val w: Int, val h: Int, val audio: Boolean, val fps: Float, val label: String, val still: Boolean)
+    private class Spec(val uri: String, val durMs: Long, val w: Int, val h: Int, val audio: Boolean, val fps: Float, val label: String, val still: Boolean, var sticker: String? = null)
 
     /** Builds a finished edit from a Discover template and the photos / videos the person picked. */
     private fun buildFromTemplate(tid: String, uris: List<Uri>) {
@@ -412,7 +412,11 @@ class MainActivity : AppCompatActivity() {
                     if (bmp != null) {
                         val out = File(File(filesDir, "tpl"), "T_" + System.currentTimeMillis() + "_" + i + ".mp4")
                         val res = FrameVideo.write(out, 30, (t.slotMs * 30 / 1000).toInt(), 5_000_000, { k -> if (k == 0) bmp else null }, { true })
-                        if (res != null) specs.add(Spec(Uri.fromFile(res.file).toString(), res.durationMs, res.width, res.height, false, 30f, name, true))
+                        if (res != null) {
+                            val sp = Spec(Uri.fromFile(res.file).toString(), res.durationMs, res.width, res.height, false, 30f, name, true)
+                            if (t.cutout && specs.count { it.sticker != null } < 6) sp.sticker = Templates.stickerFile(this, bmp, "${System.currentTimeMillis()}_$i")?.absolutePath
+                            specs.add(sp)
+                        }
                     }
                 } else {
                     val info = MediaProbe.probe(this, u)
@@ -426,7 +430,8 @@ class MainActivity : AppCompatActivity() {
                     val c = Clip(id = project.newId(), kind = LaneKind.VIDEO, uri = s.uri, srcInMs = 0, srcOutMs = s.durMs, srcTotalMs = s.durMs,
                         label = s.label, width = s.w, height = s.h, hasAudio = s.audio, fps = s.fps)
                     t.look(c)
-                    if (s.still && t.kenBurns) c.keyframes = mutableListOf(Keyframe(0, 1f, 0f, 0f, 0f), Keyframe(c.lengthMs, 1.14f, 0f, 0f, 0f))
+                    val mo = if (t.motion.isNotBlank()) t.motion else if (t.kenBurns) "kb" else ""
+                    if (mo.isNotBlank() && (s.still || t.motion.isNotBlank())) c.keyframes = Templates.motionFrames(mo, c.lengthMs, project.main.size)
                     if (!s.still && t.music != null) c.volume = 0.3f
                     project.main.add(c)
                 }
@@ -443,6 +448,25 @@ class MainActivity : AppCompatActivity() {
                 val total = project.totalMs()
                 if (t.title != null) project.text.add(Clip(id = project.newId(), kind = LaneKind.TEXT, startMs = 0, text = t.title, label = "Title",
                     durMs = min(3000L, total), sizeFrac = 0.1f, posY = 0.5f, color = t.titleColor, fadeInMs = 400, fadeOutMs = 400))
+                fun ov(kind: String, st: Long, dur: Long, label: String) {
+                    val of = Templates.overlayFile(this, kind)
+                    project.addFree(Clip(id = project.newId(), kind = LaneKind.OVERLAY, startMs = st, uri = Uri.fromFile(of).toString(), label = label,
+                        durMs = dur, sizeFrac = 1f, posX = 0.5f, posY = 0.5f))
+                }
+                if (t.leak > 0) {
+                    val lr = java.util.Random(11)
+                    val cnt = min(8, max(3, (total / 1800).toInt())) * t.leak
+                    for (k in 0 until cnt) ov("leak" + (k % 3), (lr.nextFloat() * max(1L, total - 900L)).toLong(), 500L + lr.nextInt(500), "Light leak")
+                }
+                if (t.frame) ov("frame", 0, total, "Frame")
+                if (t.bars) ov("bars", 0, total, "Cinema bars")
+                specs.forEachIndexed { si, sp ->
+                    val sf = sp.sticker ?: return@forEachIndexed
+                    val mc = project.main.getOrNull(si) ?: return@forEachIndexed
+                    val left = si % 2 == 0
+                    project.addFree(Clip(id = project.newId(), kind = LaneKind.OVERLAY, startMs = mc.startMs + mc.lengthMs * 35 / 100, uri = Uri.fromFile(File(sf)).toString(), label = "Cut-out",
+                        durMs = max(500L, mc.lengthMs * 45 / 100), sizeFrac = 0.5f, posX = if (left) 0.3f else 0.7f, posY = 0.72f))
+                }
                 if (t.sparkle) {
                     val sf = Templates.sparkleFile(this)
                     val rnd = java.util.Random(7)
