@@ -2777,8 +2777,12 @@ class MainActivity : AppCompatActivity() {
         val sorted = c.keyframes.sortedBy { it.tMs }
         if (sorted.size < 2) { toast("Graphs shape the movement between two keyframes. Tap the diamond to add keyframes first."); return }
         val local = (engine.playheadMs - c.startMs).coerceAtLeast(0L)
-        val kf = sorted.lastOrNull { it.tMs <= local + 60 } ?: sorted.first()
-        if (kf === sorted.last()) { toast("Move the playhead onto a keyframe that has another keyframe after it."); return }
+        // The segment the playhead is in; on or after the last keyframe, the segment that ends there.
+        var si = sorted.indexOfLast { it.tMs <= local + 60 }
+        if (si < 0) si = 0
+        if (si >= sorted.size - 1) si = sorted.size - 2
+        val kf = sorted[si]
+        val segEnd = sorted[si + 1]
         val box = LinearLayout(this)
         box.orientation = LinearLayout.VERTICAL
         val big = CurveView(this, kf.ease, true, true)
@@ -2789,6 +2793,7 @@ class MainActivity : AppCompatActivity() {
         fun nameOf(id: Int) = if (Easing.isCustom(id)) "Custom curve" else Easing.NAMES.getOrElse(id) { "Linear" }
         nameLine.text = nameOf(kf.ease)
         box.addView(nameLine)
+        toast("Curve for ${fmt(c.startMs + kf.tMs)} \u2192 ${fmt(c.startMs + segEnd.tMs)}")
         val chipRow = LinearLayout(this)
         val chipScroll = HorizontalScrollView(this); chipScroll.isHorizontalScrollBarEnabled = false; chipScroll.addView(chipRow)
         box.addView(chipScroll)
@@ -2836,7 +2841,7 @@ class MainActivity : AppCompatActivity() {
         }
         showCat()
         lookSheet("Graphs", c, box,
-            button("Apply to all keyframes") { val e = kf.ease; c.keyframes.forEach { if (it !== sorted.last()) it.ease = e }; live(); toast("Applied to all keyframes") },
+            button("Apply to all keyframes") { val e = kf.ease; sorted.forEach { if (it !== sorted.last()) it.ease = e }; live(); toast("Applied to all keyframes") },
             label("Shapes the speed of the movement from this keyframe to the next one."))
     }
 
